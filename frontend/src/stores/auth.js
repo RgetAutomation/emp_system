@@ -21,11 +21,26 @@ export const useAuthStore = defineStore('auth', {
         throw error;
       }
     },
-    async registerCompany(data) {
+    async registerCompany(formData) {
       try {
-        const response = await api.post('/register-company', data);
-        this.setAuthData(response.data);
-        return true;
+        const response = await api.post('/register-company', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Accept': 'application/json'
+          }
+        });
+        
+        // Ensure response structure matches new API return
+        const token = response.data.access_token || response.data.token;
+        if (token) {
+          this.setAuthData({
+            user: response.data.user,
+            access_token: token
+          });
+          return true;
+        } else {
+          throw new Error('Registration succeeded but no token received.');
+        }
       } catch (error) {
         throw error;
       }

@@ -17,6 +17,9 @@ class Company extends Model
         'address',
         'status',
         'subscription_ends_at',
+        'gst_no',
+        'trade_license',
+        'logo',
     ];
 
     protected $casts = [

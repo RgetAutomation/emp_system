@@ -66,7 +66,7 @@ const handleLogin = async () => {
               <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Mail class="h-5 w-5 text-gray-400" />
               </div>
-              <input v-model="form.email" type="email" required class="block w-full pl-11 pr-4 py-3.5 bg-white/50 backdrop-blur-sm border border-gray-200/80 rounded-2xl text-gray-900 focus:ring-2 focus:ring-blue-600/50 focus:border-blue-600 transition-all outline-none placeholder-gray-400" placeholder="name@company.com" />
+              <input v-model="form.email" type="email" required autocomplete="username" class="block w-full pl-11 pr-4 py-3.5 bg-white/50 backdrop-blur-sm border border-gray-200/80 rounded-2xl text-gray-900 focus:ring-2 focus:ring-blue-600/50 focus:border-blue-600 transition-all outline-none placeholder-gray-400" placeholder="name@company.com" />
             </div>
           </div>
 
@@ -79,7 +79,7 @@ const handleLogin = async () => {
               <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Lock class="h-5 w-5 text-gray-400" />
               </div>
-              <input v-model="form.password" type="password" required class="block w-full pl-11 pr-4 py-3.5 bg-white/50 backdrop-blur-sm border border-gray-200/80 rounded-2xl text-gray-900 focus:ring-2 focus:ring-blue-600/50 focus:border-blue-600 transition-all outline-none placeholder-gray-400" placeholder="••••••••" />
+              <input v-model="form.password" type="password" required autocomplete="current-password" class="block w-full pl-11 pr-4 py-3.5 bg-white/50 backdrop-blur-sm border border-gray-200/80 rounded-2xl text-gray-900 focus:ring-2 focus:ring-blue-600/50 focus:border-blue-600 transition-all outline-none placeholder-gray-400" placeholder="••••••••" />
             </div>
           </div>
 

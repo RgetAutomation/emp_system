@@ -23,7 +23,10 @@ const routes = [
     component: () => import('../components/layout/AdminLayout.vue'),
     meta: { requiresAuth: true, role: 'admin' },
     children: [
-      { path: 'dashboard', name: 'AdminDashboard', component: () => import('../views/admin/Dashboard.vue') }
+      { path: 'dashboard', name: 'AdminDashboard', component: () => import('../views/admin/Dashboard.vue') },
+      { path: 'departments', name: 'AdminDepartments', component: () => import('../views/admin/Departments.vue') },
+      { path: 'designations', name: 'AdminDesignations', component: () => import('../views/admin/Designations.vue') },
+      { path: 'employees', name: 'AdminEmployees', component: () => import('../views/admin/Employees.vue') }
     ]
   },
   {
@@ -41,25 +44,23 @@ const router = createRouter({
   routes
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, from) => {
   const authStore = useAuthStore();
   const isAuthenticated = authStore.isAuthenticated;
   const userRole = authStore.user?.role;
 
   if (to.meta.requiresAuth && !isAuthenticated) {
-    return next('/login');
+    return '/login';
   }
 
   if (to.meta.guest && isAuthenticated) {
-    return next(userRole === 'admin' ? '/admin/dashboard' : '/employee/dashboard');
+    return userRole === 'admin' ? '/admin/dashboard' : '/employee/dashboard';
   }
 
   if (to.meta.requiresAuth && to.meta.role && to.meta.role !== userRole) {
     // If an employee tries to access admin routes, or vice versa
-    return next(userRole === 'admin' ? '/admin/dashboard' : '/employee/dashboard');
+    return userRole === 'admin' ? '/admin/dashboard' : '/employee/dashboard';
   }
-
-  next();
 });
 
 export default router;
