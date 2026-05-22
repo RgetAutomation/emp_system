@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import api from '../axios';
+import { useAdminStore } from './admin';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -70,6 +71,9 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('user');
       localStorage.removeItem('token');
       delete api.defaults.headers.common['Authorization'];
+      
+      const adminStore = useAdminStore();
+      adminStore.resetStore();
     }
   }
 });

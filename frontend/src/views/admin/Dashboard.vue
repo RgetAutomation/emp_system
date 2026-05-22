@@ -1,8 +1,33 @@
 <script setup>
+import { onMounted, computed, ref } from 'vue';
 import { useAuthStore } from '../../stores/auth';
+import { useAdminStore } from '../../stores/admin';
 import { Users, UserPlus, Building, Briefcase } from 'lucide-vue-next';
 
 const authStore = useAuthStore();
+const adminStore = useAdminStore();
+
+const loading = ref(true);
+
+onMounted(async () => {
+  try {
+    await Promise.all([
+      adminStore.fetchEmployees(),
+      adminStore.fetchDepartments()
+    ]);
+  } catch (error) {
+    console.error('Failed to load dashboard stats:', error);
+  } finally {
+    loading.value = false;
+  }
+});
+
+const totalEmployees = computed(() => adminStore.employees.length);
+const totalDepartments = computed(() => adminStore.departments.length);
+
+// Default to 0 until the attendance and leaves modules are completed
+const presentToday = computed(() => 0);
+const onLeave = computed(() => 0);
 </script>
 
 <template>
@@ -19,10 +44,12 @@ const authStore = useAuthStore();
           <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
             <Users class="w-6 h-6" />
           </div>
-          <span class="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded-md">+12%</span>
         </div>
         <h3 class="text-gray-500 text-sm font-medium">Total Employees</h3>
-        <p class="text-3xl font-bold text-gray-900 mt-1">124</p>
+        <p class="text-3xl font-bold text-gray-900 mt-1">
+          <span v-if="loading" class="text-gray-300">...</span>
+          <span v-else>{{ totalEmployees }}</span>
+        </p>
       </div>
       
       <div class="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
@@ -33,7 +60,10 @@ const authStore = useAuthStore();
           <span class="text-sm font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded-md">Today</span>
         </div>
         <h3 class="text-gray-500 text-sm font-medium">Present Today</h3>
-        <p class="text-3xl font-bold text-gray-900 mt-1">118</p>
+        <p class="text-3xl font-bold text-gray-900 mt-1">
+          <span v-if="loading" class="text-gray-300">...</span>
+          <span v-else>{{ presentToday }}</span>
+        </p>
       </div>
       
       <div class="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
@@ -43,7 +73,10 @@ const authStore = useAuthStore();
           </div>
         </div>
         <h3 class="text-gray-500 text-sm font-medium">On Leave</h3>
-        <p class="text-3xl font-bold text-gray-900 mt-1">6</p>
+        <p class="text-3xl font-bold text-gray-900 mt-1">
+          <span v-if="loading" class="text-gray-300">...</span>
+          <span v-else>{{ onLeave }}</span>
+        </p>
       </div>
       
       <div class="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
@@ -53,7 +86,10 @@ const authStore = useAuthStore();
           </div>
         </div>
         <h3 class="text-gray-500 text-sm font-medium">Departments</h3>
-        <p class="text-3xl font-bold text-gray-900 mt-1">8</p>
+        <p class="text-3xl font-bold text-gray-900 mt-1">
+          <span v-if="loading" class="text-gray-300">...</span>
+          <span v-else>{{ totalDepartments }}</span>
+        </p>
       </div>
     </div>
     

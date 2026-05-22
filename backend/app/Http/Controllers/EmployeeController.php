@@ -22,6 +22,12 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
+        \Illuminate\Support\Facades\Log::info("Store employee request", [
+            'has_profile_photo' => $request->hasFile('profile_photo'),
+            'all_files' => array_keys($request->allFiles()),
+            'inputs' => $request->except(['password'])
+        ]);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -60,6 +66,19 @@ class EmployeeController extends Controller
             $identity_docs = $request->filled('identity_docs') ? json_decode($request->identity_docs, true) : null;
             $education_experience = $request->filled('education_experience') ? json_decode($request->education_experience, true) : null;
 
+            // Auto generate employee_id if not provided
+            $employeeId = $request->employee_id;
+            if (empty($employeeId)) {
+                $count = Employee::where('company_id', $company_id)->count() + 1;
+                do {
+                    $employeeId = 'EMP-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+                    $exists = Employee::where('company_id', $company_id)->where('employee_id', $employeeId)->exists();
+                    if ($exists) {
+                        $count++;
+                    }
+                } while ($exists);
+            }
+
             $employee = Employee::create([
                 'user_id' => $user->id,
                 'company_id' => $company_id,
@@ -69,7 +88,7 @@ class EmployeeController extends Controller
                 'salary' => $request->salary,
                 'join_date' => $request->join_date,
                 
-                'employee_id' => $request->employee_id,
+                'employee_id' => $employeeId,
                 'gender' => $request->gender,
                 'dob' => $request->dob,
                 'employment_type' => $request->employment_type,
@@ -93,6 +112,13 @@ class EmployeeController extends Controller
 
     public function update(Request $request, $id)
     {
+        \Illuminate\Support\Facades\Log::info("Update employee request", [
+            'id' => $id,
+            'has_profile_photo' => $request->hasFile('profile_photo'),
+            'all_files' => array_keys($request->allFiles()),
+            'inputs' => $request->except(['password'])
+        ]);
+
         $employee = Employee::where('company_id', $request->user()->company_id)->findOrFail($id);
 
         $request->validate([

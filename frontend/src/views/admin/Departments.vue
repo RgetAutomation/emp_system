@@ -19,10 +19,17 @@ const openCreateModal = () => {
   showModal.value = true;
 };
 
+const openEditModal = (dept) => {
+  isEditing.value = true;
+  editId.value = dept.id;
+  form.value.name = dept.name;
+  showModal.value = true;
+};
+
 const handleSubmit = async () => {
   try {
     if (isEditing.value) {
-      // await adminStore.updateDepartment(editId.value, form.value); // Add update logic later
+      await adminStore.updateDepartment(editId.value, form.value);
     } else {
       await adminStore.createDepartment(form.value);
     }
@@ -73,7 +80,7 @@ const handleDelete = async (id) => {
             <td class="px-6 py-4 font-medium text-gray-900">#{{ dept.id }}</td>
             <td class="px-6 py-4">{{ dept.name }}</td>
             <td class="px-6 py-4 text-right flex justify-end gap-2">
-              <button class="p-1.5 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50">
+              <button @click="openEditModal(dept)" class="p-1.5 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50">
                 <Edit2 class="w-4 h-4" />
               </button>
               <button @click="handleDelete(dept.id)" class="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50">

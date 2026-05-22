@@ -24,14 +24,14 @@ const handleLogout = async () => {
       </div>
       
       <div class="flex-1 py-6 px-4 space-y-1">
-        <router-link to="/employee/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-50 text-blue-700 font-medium">
+        <router-link to="/employee/dashboard" exact-active-class="bg-blue-50 text-blue-700" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
           <LayoutDashboard class="w-5 h-5" />
           Dashboard
         </router-link>
-        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
+        <router-link to="/employee/attendance" exact-active-class="bg-blue-50 text-blue-700" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
           <CalendarClock class="w-5 h-5" />
           My Attendance
-        </a>
+        </router-link>
         <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
           <Plane class="w-5 h-5" />
           Leave Requests

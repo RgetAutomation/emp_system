@@ -19,10 +19,17 @@ const openCreateModal = () => {
   showModal.value = true;
 };
 
+const openEditModal = (desig) => {
+  isEditing.value = true;
+  editId.value = desig.id;
+  form.value.name = desig.name;
+  showModal.value = true;
+};
+
 const handleSubmit = async () => {
   try {
     if (isEditing.value) {
-      // update logic later
+      await adminStore.updateDesignation(editId.value, form.value);
     } else {
       await adminStore.createDesignation(form.value);
     }
@@ -73,7 +80,7 @@ const handleDelete = async (id) => {
             <td class="px-6 py-4 font-medium text-gray-900">#{{ desig.id }}</td>
             <td class="px-6 py-4">{{ desig.name }}</td>
             <td class="px-6 py-4 text-right flex justify-end gap-2">
-              <button class="p-1.5 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50">
+              <button @click="openEditModal(desig)" class="p-1.5 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50">
                 <Edit2 class="w-4 h-4" />
               </button>
               <button @click="handleDelete(desig.id)" class="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50">

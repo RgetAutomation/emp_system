@@ -30,6 +30,18 @@ export const useAdminStore = defineStore('admin', {
         throw err;
       }
     },
+    async updateDepartment(id, data) {
+      try {
+        const response = await api.put(`/departments/${id}`, data);
+        const index = this.departments.findIndex(d => d.id === id);
+        if (index !== -1) {
+          this.departments[index] = response.data;
+        }
+        return true;
+      } catch (err) {
+        throw err;
+      }
+    },
     async deleteDepartment(id) {
       try {
         await api.delete(`/departments/${id}`);
@@ -53,6 +65,18 @@ export const useAdminStore = defineStore('admin', {
       try {
         const response = await api.post('/designations', data);
         this.designations.push(response.data);
+        return true;
+      } catch (err) {
+        throw err;
+      }
+    },
+    async updateDesignation(id, data) {
+      try {
+        const response = await api.put(`/designations/${id}`, data);
+        const index = this.designations.findIndex(d => d.id === id);
+        if (index !== -1) {
+          this.designations[index] = response.data;
+        }
         return true;
       } catch (err) {
         throw err;
@@ -90,6 +114,23 @@ export const useAdminStore = defineStore('admin', {
         throw err;
       }
     },
+    async updateEmployee(id, formData) {
+      try {
+        formData.append('_method', 'PUT');
+        const response = await api.post(`/employees/${id}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        const index = this.employees.findIndex(e => e.id === id);
+        if (index !== -1) {
+          this.employees[index] = response.data;
+        }
+        return true;
+      } catch (err) {
+        throw err;
+      }
+    },
     async deleteEmployee(id) {
       try {
         await api.delete(`/employees/${id}`);
@@ -97,6 +138,13 @@ export const useAdminStore = defineStore('admin', {
       } catch (err) {
         throw err;
       }
+    },
+    resetStore() {
+      this.departments = [];
+      this.designations = [];
+      this.employees = [];
+      this.loading = false;
+      this.error = null;
     }
   }
 });

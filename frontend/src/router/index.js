@@ -26,7 +26,8 @@ const routes = [
       { path: 'dashboard', name: 'AdminDashboard', component: () => import('../views/admin/Dashboard.vue') },
       { path: 'departments', name: 'AdminDepartments', component: () => import('../views/admin/Departments.vue') },
       { path: 'designations', name: 'AdminDesignations', component: () => import('../views/admin/Designations.vue') },
-      { path: 'employees', name: 'AdminEmployees', component: () => import('../views/admin/Employees.vue') }
+      { path: 'employees', name: 'AdminEmployees', component: () => import('../views/admin/Employees.vue') },
+      { path: 'attendance', name: 'AdminAttendance', component: () => import('../views/admin/Attendance.vue') }
     ]
   },
   {
@@ -34,7 +35,8 @@ const routes = [
     component: () => import('../components/layout/EmployeeLayout.vue'),
     meta: { requiresAuth: true, role: 'employee' },
     children: [
-      { path: 'dashboard', name: 'EmployeeDashboard', component: () => import('../views/employee/Dashboard.vue') }
+      { path: 'dashboard', name: 'EmployeeDashboard', component: () => import('../views/employee/Dashboard.vue') },
+      { path: 'attendance', name: 'EmployeeAttendance', component: () => import('../views/employee/Attendance.vue') }
     ]
   }
 ];

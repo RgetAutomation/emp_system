@@ -8,17 +8,10 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DesignationController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\AttendanceController;
 
 Route::post('/register-company', [AuthController::class, 'registerCompany']);
 Route::post('/login', [AuthController::class, 'login']);
-
-Route::get('/test-user', function (Request $request) {
-    $attempt = Auth::attempt(['email' => 'johndeo123@gmail.com', 'password' => '123456']);
-    return response()->json([
-        'attempt_success' => $attempt,
-        'user' => \App\Models\User::where('email', 'johndeo123@gmail.com')->first()
-    ]);
-});
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
@@ -28,4 +21,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('designations', DesignationController::class);
     Route::apiResource('employees', EmployeeController::class);
+
+    // Attendance Routes
+    Route::get('/attendance/status', [AttendanceController::class, 'todayStatus']);
+    Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
+    Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
+    Route::apiResource('attendance', AttendanceController::class)->only(['index', 'update', 'destroy']);
 });

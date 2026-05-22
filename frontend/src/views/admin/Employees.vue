@@ -1,12 +1,32 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import { useAdminStore } from '../../stores/admin';
-import { Users, Plus, Trash2, Edit2, Mail, Phone, Calendar, UploadCloud, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-vue-next';
+import { Users, Plus, Trash2, Edit2, Mail, Phone, Calendar, UploadCloud, ChevronRight, ChevronLeft, CheckCircle2, X, FileText, ExternalLink } from 'lucide-vue-next';
 
 const adminStore = useAdminStore();
 const showModal = ref(false);
 const isEditing = ref(false);
+const editId = ref(null);
 const activeTab = ref(1);
+
+// Profile View Modal States
+const showProfileModal = ref(false);
+const selectedEmployee = ref(null);
+const profileTab = ref('Job & Account');
+
+const openProfileModal = (emp) => {
+  selectedEmployee.value = emp;
+  profileTab.value = 'Job & Account';
+  showProfileModal.value = true;
+};
+
+const editFromProfile = () => {
+  if (selectedEmployee.value) {
+    const emp = selectedEmployee.value;
+    showProfileModal.value = false;
+    openEditModal(emp);
+  }
+};
 
 const tabs = [
   { id: 1, name: 'Account & Job' },
@@ -41,6 +61,12 @@ const files = ref({
   resume: null, education_cert: null, experience_letter: null, signature: null, offer_letter: null, appointment_letter: null
 });
 
+const existingDocuments = ref({});
+const getFileName = (path) => {
+  if (!path) return '';
+  return path.split('/').pop();
+};
+
 onMounted(async () => {
   await Promise.all([
     adminStore.fetchEmployees(),
@@ -52,6 +78,7 @@ onMounted(async () => {
 const openCreateModal = () => {
   isEditing.value = false;
   activeTab.value = 1;
+  existingDocuments.value = {};
   
   // Reset form
   form.value = {
@@ -104,7 +131,7 @@ const handleSubmit = async () => {
     });
 
     if (isEditing.value) {
-      // update logic
+      await adminStore.updateEmployee(editId.value, formData);
     } else {
       await adminStore.createEmployee(formData);
     }
@@ -112,6 +139,72 @@ const handleSubmit = async () => {
   } catch (error) {
     alert(error.response?.data?.message || 'Failed to save employee');
   }
+};
+
+const openEditModal = (emp) => {
+  isEditing.value = true;
+  editId.value = emp.id;
+  activeTab.value = 1;
+  
+  // Populate form with all employee details
+  form.value = {
+    name: emp.user?.name || '',
+    email: emp.user?.email || '',
+    password: '',
+    employee_id: emp.employee_id || '',
+    department_id: emp.department_id || '',
+    designation_id: emp.designation_id || '',
+    employment_type: emp.employment_type || '',
+    join_date: emp.join_date ? emp.join_date.split('T')[0] : '',
+    dob: emp.dob ? emp.dob.split('T')[0] : '',
+    gender: emp.gender || '',
+    phone: emp.phone || '',
+    salary: emp.salary || '',
+    status: emp.status || 'active',
+    personal_details: {
+      father_name: emp.personal_details?.father_name || '',
+      mother_name: emp.personal_details?.mother_name || '',
+      marital_status: emp.personal_details?.marital_status || '',
+      blood_group: emp.personal_details?.blood_group || '',
+      current_address: emp.personal_details?.current_address || '',
+      permanent_address: emp.personal_details?.permanent_address || '',
+      emergency_contact_name: emp.personal_details?.emergency_contact_name || '',
+      emergency_contact_phone: emp.personal_details?.emergency_contact_phone || ''
+    },
+    bank_details: {
+      salary_type: emp.bank_details?.salary_type || '',
+      bank_name: emp.bank_details?.bank_name || '',
+      account_holder_name: emp.bank_details?.account_holder_name || '',
+      bank_account_no: emp.bank_details?.bank_account_no || '',
+      ifsc_code: emp.bank_details?.ifsc_code || '',
+      uan_no: emp.bank_details?.uan_no || '',
+      pf_applicable: emp.bank_details?.pf_applicable || false,
+      esic_no: emp.bank_details?.esic_no || '',
+      tds_applicable: emp.bank_details?.tds_applicable || false
+    },
+    identity_docs: {
+      pan_no: emp.identity_docs?.pan_no || '',
+      aadhaar_no: emp.identity_docs?.aadhaar_no || '',
+      biometric_id: emp.identity_docs?.biometric_id || '',
+      rfid_number: emp.identity_docs?.rfid_number || ''
+    },
+    education_experience: {
+      highest_qualification: emp.education_experience?.highest_qualification || '',
+      college_university: emp.education_experience?.college_university || '',
+      passing_year: emp.education_experience?.passing_year || '',
+      skills: emp.education_experience?.skills || '',
+      prev_company_name: emp.education_experience?.prev_company_name || '',
+      prev_designation: emp.education_experience?.prev_designation || '',
+      years_of_experience: emp.education_experience?.years_of_experience || '',
+      last_salary: emp.education_experience?.last_salary || ''
+    }
+  };
+  
+  // Reset files state
+  Object.keys(files.value).forEach(key => files.value[key] = null);
+  existingDocuments.value = emp.documents || {};
+  
+  showModal.value = true;
 };
 
 const handleDelete = async (id) => {
@@ -153,7 +246,7 @@ const handleDelete = async (id) => {
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
-          <tr v-for="emp in adminStore.employees" :key="emp.id" class="hover:bg-gray-50 transition-colors">
+          <tr v-for="emp in adminStore.employees" :key="emp.id" class="hover:bg-gray-50/80 transition-colors cursor-pointer group" @click="openProfileModal(emp)">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
                 <img v-if="emp.documents?.profile_photo" :src="`http://localhost:8000/storage/${emp.documents.profile_photo}`" class="w-10 h-10 rounded-full object-cover border border-gray-200" />
@@ -161,7 +254,7 @@ const handleDelete = async (id) => {
                   {{ emp.user?.name?.charAt(0) }}
                 </div>
                 <div>
-                  <div class="font-medium text-gray-900">{{ emp.user?.name }}</div>
+                  <div class="font-medium text-gray-900 group-hover:text-blue-600 group-hover:underline transition-colors">{{ emp.user?.name }}</div>
                   <div class="text-xs text-gray-500">ID: {{ emp.employee_id || `EMP-${emp.id.toString().padStart(4, '0')}` }}</div>
                 </div>
               </div>
@@ -180,9 +273,9 @@ const handleDelete = async (id) => {
                 {{ emp.join_date ? new Date(emp.join_date).toLocaleDateString() : 'N/A' }}
               </div>
             </td>
-            <td class="px-6 py-4 text-right">
+            <td class="px-6 py-4 text-right cursor-default" @click.stop>
               <div class="flex justify-end gap-2">
-                <button class="p-1.5 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50">
+                <button @click="openEditModal(emp)" class="p-1.5 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50">
                   <Edit2 class="w-4 h-4" />
                 </button>
                 <button @click="handleDelete(emp.id)" class="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50">
@@ -198,6 +291,288 @@ const handleDelete = async (id) => {
       </table>
     </div>
 
+    <!-- Profile View Modal -->
+    <div v-if="showProfileModal && selectedEmployee" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white relative">
+          <button @click="showProfileModal = false" class="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 border border-white/10 transition-all flex items-center justify-center">
+            <X class="w-5 h-5" />
+          </button>
+          
+          <div class="flex flex-col sm:flex-row items-center gap-5">
+            <img v-if="selectedEmployee.documents?.profile_photo" :src="`http://localhost:8000/storage/${selectedEmployee.documents.profile_photo}`" class="w-24 h-24 rounded-full object-cover border-4 border-white/20 shadow-md" />
+            <div v-else class="w-24 h-24 rounded-full bg-white/15 text-white flex items-center justify-center font-bold text-4xl border-4 border-white/20 shadow-md">
+              {{ selectedEmployee.user?.name?.charAt(0) }}
+            </div>
+            
+            <div class="text-center sm:text-left space-y-1">
+              <h3 class="font-bold text-2xl tracking-tight">{{ selectedEmployee.user?.name }}</h3>
+              <p class="text-blue-100 font-medium text-sm flex items-center justify-center sm:justify-start gap-2">
+                <span>{{ selectedEmployee.designation?.name || 'No Designation' }}</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-200"></span>
+                <span>{{ selectedEmployee.department?.name || 'No Department' }}</span>
+              </p>
+              <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 mt-2">
+                <span class="px-2.5 py-0.5 rounded-full bg-white/15 text-xs font-semibold uppercase tracking-wider">
+                  {{ selectedEmployee.employee_id || `EMP-${selectedEmployee.id.toString().padStart(4, '0')}` }}
+                </span>
+                <span 
+                  :class="[
+                    'px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider',
+                    selectedEmployee.status === 'active' ? 'bg-green-400/20 text-green-200' : 'bg-red-400/20 text-red-200'
+                  ]"
+                >
+                  {{ selectedEmployee.status }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Tab Selectors -->
+        <div class="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
+          <button 
+            v-for="t in ['Job & Account', 'Personal Details', 'Bank & Tax Info', 'Edu & Experience', 'Documents']" 
+            :key="t"
+            @click="profileTab = t"
+            class="px-6 py-3.5 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors"
+            :class="profileTab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-900'"
+          >
+            {{ t }}
+          </button>
+        </div>
+        
+        <!-- Content -->
+        <div class="p-8 overflow-y-auto flex-1 min-h-0 custom-scrollbar space-y-6">
+          <!-- Tab 1: Job & Account -->
+          <div v-if="profileTab === 'Job & Account'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="info-group">
+              <span class="info-label">Email Address</span>
+              <span class="info-value">{{ selectedEmployee.user?.email }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Phone Number</span>
+              <span class="info-value">{{ selectedEmployee.phone || 'N/A' }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Employment Type</span>
+              <span class="info-value">{{ selectedEmployee.employment_type || 'N/A' }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Joining Date</span>
+              <span class="info-value">{{ selectedEmployee.join_date ? new Date(selectedEmployee.join_date).toLocaleDateString() : 'N/A' }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Basic Salary</span>
+              <span class="info-value font-semibold text-gray-950">{{ selectedEmployee.salary ? `${selectedEmployee.salary} / month` : 'N/A' }}</span>
+            </div>
+          </div>
+          
+          <!-- Tab 2: Personal Details -->
+          <div v-if="profileTab === 'Personal Details'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="info-group">
+              <span class="info-label">Date of Birth</span>
+              <span class="info-value">{{ selectedEmployee.dob ? new Date(selectedEmployee.dob).toLocaleDateString() : 'N/A' }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Gender</span>
+              <span class="info-value">{{ selectedEmployee.gender || 'N/A' }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Blood Group</span>
+              <span class="info-value">{{ selectedEmployee.personal_details?.blood_group || 'N/A' }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Marital Status</span>
+              <span class="info-value">{{ selectedEmployee.personal_details?.marital_status || 'N/A' }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Father's Name</span>
+              <span class="info-value">{{ selectedEmployee.personal_details?.father_name || 'N/A' }}</span>
+            </div>
+            <div class="info-group">
+              <span class="info-label">Mother's Name</span>
+              <span class="info-value">{{ selectedEmployee.personal_details?.mother_name || 'N/A' }}</span>
+            </div>
+            <div class="info-group md:col-span-2">
+              <span class="info-label">Current Address</span>
+              <span class="info-value whitespace-pre-line">{{ selectedEmployee.personal_details?.current_address || 'N/A' }}</span>
+            </div>
+            <div class="info-group md:col-span-2">
+              <span class="info-label">Permanent Address</span>
+              <span class="info-value whitespace-pre-line">{{ selectedEmployee.personal_details?.permanent_address || 'N/A' }}</span>
+            </div>
+            
+            <div class="md:col-span-2 border-t pt-4 mt-2">
+              <h4 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Emergency Contact</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="info-group">
+                  <span class="info-label">Contact Name</span>
+                  <span class="info-value">{{ selectedEmployee.personal_details?.emergency_contact_name || 'N/A' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">Contact Phone</span>
+                  <span class="info-value">{{ selectedEmployee.personal_details?.emergency_contact_phone || 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Tab 3: Bank & Tax Info -->
+          <div v-if="profileTab === 'Bank & Tax Info'" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="info-group">
+                <span class="info-label">Salary Type</span>
+                <span class="info-value">{{ selectedEmployee.bank_details?.salary_type || 'N/A' }}</span>
+              </div>
+              <div class="info-group">
+                <span class="info-label">Bank Name</span>
+                <span class="info-value">{{ selectedEmployee.bank_details?.bank_name || 'N/A' }}</span>
+              </div>
+              <div class="info-group">
+                <span class="info-label">Account Holder Name</span>
+                <span class="info-value">{{ selectedEmployee.bank_details?.account_holder_name || 'N/A' }}</span>
+              </div>
+              <div class="info-group">
+                <span class="info-label">Account Number</span>
+                <span class="info-value font-mono">{{ selectedEmployee.bank_details?.bank_account_no || 'N/A' }}</span>
+              </div>
+              <div class="info-group">
+                <span class="info-label">IFSC Code</span>
+                <span class="info-value font-mono">{{ selectedEmployee.bank_details?.ifsc_code || 'N/A' }}</span>
+              </div>
+            </div>
+            
+            <div class="border-t pt-6 mt-4">
+              <h4 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Identity & Tax IDs</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="info-group">
+                  <span class="info-label">PAN Card Number</span>
+                  <span class="info-value font-mono">{{ selectedEmployee.identity_docs?.pan_no || 'N/A' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">Aadhaar Card Number</span>
+                  <span class="info-value font-mono">{{ selectedEmployee.identity_docs?.aadhaar_no || 'N/A' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">UAN Number (PF)</span>
+                  <span class="info-value font-mono">{{ selectedEmployee.bank_details?.uan_no || 'N/A' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">ESIC Number</span>
+                  <span class="info-value font-mono">{{ selectedEmployee.bank_details?.esic_no || 'N/A' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">PF Status</span>
+                  <span class="info-value">{{ selectedEmployee.bank_details?.pf_applicable ? 'Applicable' : 'Not Applicable' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">TDS Status</span>
+                  <span class="info-value">{{ selectedEmployee.bank_details?.tds_applicable ? 'Applicable' : 'Not Applicable' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Tab 4: Edu & Experience -->
+          <div v-if="profileTab === 'Edu & Experience'" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="info-group">
+                <span class="info-label">Highest Qualification</span>
+                <span class="info-value">{{ selectedEmployee.education_experience?.highest_qualification || 'N/A' }}</span>
+              </div>
+              <div class="info-group">
+                <span class="info-label">College / University</span>
+                <span class="info-value">{{ selectedEmployee.education_experience?.college_university || 'N/A' }}</span>
+              </div>
+              <div class="info-group">
+                <span class="info-label">Passing Year</span>
+                <span class="info-value">{{ selectedEmployee.education_experience?.passing_year || 'N/A' }}</span>
+              </div>
+              <div class="info-group">
+                <span class="info-label">Skills</span>
+                <div class="flex flex-wrap gap-1.5 mt-1.5">
+                  <span v-for="skill in (selectedEmployee.education_experience?.skills?.split(',') || [])" :key="skill" class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">
+                    {{ skill.trim() }}
+                  </span>
+                  <span v-if="!selectedEmployee.education_experience?.skills">N/A</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="border-t pt-6 mt-4">
+              <h4 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Work Experience</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="info-group">
+                  <span class="info-label">Previous Company</span>
+                  <span class="info-value">{{ selectedEmployee.education_experience?.prev_company_name || 'N/A' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">Previous Designation</span>
+                  <span class="info-value">{{ selectedEmployee.education_experience?.prev_designation || 'N/A' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">Years of Experience</span>
+                  <span class="info-value">{{ selectedEmployee.education_experience?.years_of_experience ? `${selectedEmployee.education_experience.years_of_experience} yrs` : 'N/A' }}</span>
+                </div>
+                <div class="info-group">
+                  <span class="info-label">Last Drawn Salary</span>
+                  <span class="info-value">{{ selectedEmployee.education_experience?.last_salary || 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Tab 5: Documents -->
+          <div v-if="profileTab === 'Documents'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div 
+              v-for="docName in [
+                { key: 'resume', label: 'Resume / CV' },
+                { key: 'aadhaar_doc', label: 'Aadhaar Card' },
+                { key: 'pan_doc', label: 'PAN Card' },
+                { key: 'education_cert', label: 'Education Certificate' },
+                { key: 'experience_letter', label: 'Experience Letter' },
+                { key: 'offer_letter', label: 'Offer Letter' },
+                { key: 'signature', label: 'Digital Signature' },
+                { key: 'appointment_letter', label: 'Appointment Letter' }
+              ]" 
+              :key="docName.key" 
+              class="p-4 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between gap-4"
+            >
+              <div>
+                <div class="font-semibold text-gray-800 text-sm">{{ docName.label }}</div>
+                <div class="text-xs text-gray-400 mt-0.5">
+                  {{ selectedEmployee.documents?.[docName.key] ? 'Uploaded' : 'Not Uploaded' }}
+                </div>
+              </div>
+              <a 
+                v-if="selectedEmployee.documents?.[docName.key]" 
+                :href="`http://localhost:8000/storage/${selectedEmployee.documents[docName.key]}`" 
+                target="_blank"
+                class="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors whitespace-nowrap"
+              >
+                View File
+              </a>
+              <span v-else class="text-xs text-gray-300 font-semibold italic">N/A</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="px-8 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+          <button @click="editFromProfile" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-2">
+            <Edit2 class="w-4 h-4" />
+            Edit Profile
+          </button>
+          <button @click="showProfileModal = false" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-sm transition-colors border border-gray-200">
+            Close Profile
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Multi-Step Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -206,7 +581,9 @@ const handleDelete = async (id) => {
         <div class="bg-gray-50 border-b border-gray-200">
           <div class="px-6 py-4 flex justify-between items-center">
             <h3 class="font-bold text-xl text-gray-900">{{ isEditing ? 'Edit' : 'Register' }} Employee</h3>
-            <button @click="showModal = false" class="text-gray-400 hover:text-gray-600 bg-white rounded-full p-1 border border-gray-200">&times;</button>
+            <button @click="showModal = false" class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 bg-white rounded-full p-1 border border-gray-200 transition-colors flex items-center justify-center">
+              <X class="w-4 h-4" />
+            </button>
           </div>
           
           <div class="px-6 pb-4">
@@ -234,7 +611,7 @@ const handleDelete = async (id) => {
             <div v-if="activeTab === 1" class="space-y-6">
               <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">Account & Employment Details</h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Employee ID</label><input v-model="form.employee_id" type="text" class="form-input" /></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Employee ID</label><input v-model="form.employee_id" type="text" class="form-input" placeholder="e.g. EMP-0001 (Auto-generates if empty)" /></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label><input v-model="form.name" type="text" required class="form-input" /></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Email Address *</label><input v-model="form.email" type="email" required class="form-input" /></div>
                 <div v-if="!isEditing"><label class="block text-sm font-medium text-gray-700 mb-1">Initial Password *</label><input v-model="form.password" type="text" required class="form-input" /></div>
@@ -359,34 +736,98 @@ const handleDelete = async (id) => {
                 <div class="file-input-group">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Profile Photo</label>
                   <input type="file" @change="e => handleFileUpload(e, 'profile_photo')" accept="image/*" class="file-input" />
+                  <div v-if="isEditing && existingDocuments.profile_photo" class="mt-1.5 flex items-center gap-2 text-xs text-blue-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100/50 w-fit">
+                    <FileText class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span class="text-gray-500 font-medium">Current:</span>
+                    <a :href="`http://localhost:8000/storage/${existingDocuments.profile_photo}`" target="_blank" class="font-semibold hover:underline flex items-center gap-0.5 truncate max-w-[200px]" :title="getFileName(existingDocuments.profile_photo)">
+                      {{ getFileName(existingDocuments.profile_photo) }}
+                      <ExternalLink class="w-3 h-3 flex-shrink-0 inline" />
+                    </a>
+                  </div>
                 </div>
                 <div class="file-input-group">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Resume / CV</label>
                   <input type="file" @change="e => handleFileUpload(e, 'resume')" accept=".pdf,.doc,.docx" class="file-input" />
+                  <div v-if="isEditing && existingDocuments.resume" class="mt-1.5 flex items-center gap-2 text-xs text-blue-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100/50 w-fit">
+                    <FileText class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span class="text-gray-500 font-medium">Current:</span>
+                    <a :href="`http://localhost:8000/storage/${existingDocuments.resume}`" target="_blank" class="font-semibold hover:underline flex items-center gap-0.5 truncate max-w-[200px]" :title="getFileName(existingDocuments.resume)">
+                      {{ getFileName(existingDocuments.resume) }}
+                      <ExternalLink class="w-3 h-3 flex-shrink-0 inline" />
+                    </a>
+                  </div>
                 </div>
                 <div class="file-input-group">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Aadhaar Card</label>
                   <input type="file" @change="e => handleFileUpload(e, 'aadhaar_doc')" class="file-input" />
+                  <div v-if="isEditing && existingDocuments.aadhaar_doc" class="mt-1.5 flex items-center gap-2 text-xs text-blue-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100/50 w-fit">
+                    <FileText class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span class="text-gray-500 font-medium">Current:</span>
+                    <a :href="`http://localhost:8000/storage/${existingDocuments.aadhaar_doc}`" target="_blank" class="font-semibold hover:underline flex items-center gap-0.5 truncate max-w-[200px]" :title="getFileName(existingDocuments.aadhaar_doc)">
+                      {{ getFileName(existingDocuments.aadhaar_doc) }}
+                      <ExternalLink class="w-3 h-3 flex-shrink-0 inline" />
+                    </a>
+                  </div>
                 </div>
                 <div class="file-input-group">
                   <label class="block text-sm font-medium text-gray-700 mb-1">PAN Card</label>
                   <input type="file" @change="e => handleFileUpload(e, 'pan_doc')" class="file-input" />
+                  <div v-if="isEditing && existingDocuments.pan_doc" class="mt-1.5 flex items-center gap-2 text-xs text-blue-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100/50 w-fit">
+                    <FileText class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span class="text-gray-500 font-medium">Current:</span>
+                    <a :href="`http://localhost:8000/storage/${existingDocuments.pan_doc}`" target="_blank" class="font-semibold hover:underline flex items-center gap-0.5 truncate max-w-[200px]" :title="getFileName(existingDocuments.pan_doc)">
+                      {{ getFileName(existingDocuments.pan_doc) }}
+                      <ExternalLink class="w-3 h-3 flex-shrink-0 inline" />
+                    </a>
+                  </div>
                 </div>
                 <div class="file-input-group">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Education Certificate</label>
                   <input type="file" @change="e => handleFileUpload(e, 'education_cert')" class="file-input" />
+                  <div v-if="isEditing && existingDocuments.education_cert" class="mt-1.5 flex items-center gap-2 text-xs text-blue-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100/50 w-fit">
+                    <FileText class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span class="text-gray-500 font-medium">Current:</span>
+                    <a :href="`http://localhost:8000/storage/${existingDocuments.education_cert}`" target="_blank" class="font-semibold hover:underline flex items-center gap-0.5 truncate max-w-[200px]" :title="getFileName(existingDocuments.education_cert)">
+                      {{ getFileName(existingDocuments.education_cert) }}
+                      <ExternalLink class="w-3 h-3 flex-shrink-0 inline" />
+                    </a>
+                  </div>
                 </div>
                 <div class="file-input-group">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Experience Letter</label>
                   <input type="file" @change="e => handleFileUpload(e, 'experience_letter')" class="file-input" />
+                  <div v-if="isEditing && existingDocuments.experience_letter" class="mt-1.5 flex items-center gap-2 text-xs text-blue-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100/50 w-fit">
+                    <FileText class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span class="text-gray-500 font-medium">Current:</span>
+                    <a :href="`http://localhost:8000/storage/${existingDocuments.experience_letter}`" target="_blank" class="font-semibold hover:underline flex items-center gap-0.5 truncate max-w-[200px]" :title="getFileName(existingDocuments.experience_letter)">
+                      {{ getFileName(existingDocuments.experience_letter) }}
+                      <ExternalLink class="w-3 h-3 flex-shrink-0 inline" />
+                    </a>
+                  </div>
                 </div>
                 <div class="file-input-group">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Offer Letter (Current)</label>
                   <input type="file" @change="e => handleFileUpload(e, 'offer_letter')" class="file-input" />
+                  <div v-if="isEditing && existingDocuments.offer_letter" class="mt-1.5 flex items-center gap-2 text-xs text-blue-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100/50 w-fit">
+                    <FileText class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span class="text-gray-500 font-medium">Current:</span>
+                    <a :href="`http://localhost:8000/storage/${existingDocuments.offer_letter}`" target="_blank" class="font-semibold hover:underline flex items-center gap-0.5 truncate max-w-[200px]" :title="getFileName(existingDocuments.offer_letter)">
+                      {{ getFileName(existingDocuments.offer_letter) }}
+                      <ExternalLink class="w-3 h-3 flex-shrink-0 inline" />
+                    </a>
+                  </div>
                 </div>
                 <div class="file-input-group">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Digital Signature</label>
                   <input type="file" @change="e => handleFileUpload(e, 'signature')" accept="image/*" class="file-input" />
+                  <div v-if="isEditing && existingDocuments.signature" class="mt-1.5 flex items-center gap-2 text-xs text-blue-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100/50 w-fit">
+                    <FileText class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span class="text-gray-500 font-medium">Current:</span>
+                    <a :href="`http://localhost:8000/storage/${existingDocuments.signature}`" target="_blank" class="font-semibold hover:underline flex items-center gap-0.5 truncate max-w-[200px]" :title="getFileName(existingDocuments.signature)">
+                      {{ getFileName(existingDocuments.signature) }}
+                      <ExternalLink class="w-3 h-3 flex-shrink-0 inline" />
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -431,6 +872,16 @@ const handleDelete = async (id) => {
 
 <style scoped>
 @reference "tailwindcss";
+
+.info-group {
+  @apply flex flex-col gap-1 bg-gray-50/50 p-3.5 rounded-xl border border-gray-100;
+}
+.info-label {
+  @apply text-xs font-bold text-gray-400 uppercase tracking-wider;
+}
+.info-value {
+  @apply text-sm font-semibold text-gray-800;
+}
 
 .form-input {
   @apply block w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 shadow-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all text-sm;
