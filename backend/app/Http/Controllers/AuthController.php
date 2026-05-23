@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -16,30 +17,58 @@ class AuthController extends Controller
             'company_name' => 'required|string|max:255',
             'admin_name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => 'required|string|min:6|confirmed',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string',
+            'gst_no' => 'nullable|string|max:50',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'trade_license' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:5120',
         ]);
 
-        $company = Company::create([
-            'name' => $request->company_name,
-            'email' => $request->email,
-            'status' => 'active',
-        ]);
+        DB::beginTransaction();
 
-        $user = User::create([
-            'company_id' => $company->id,
-            'name' => $request->admin_name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => 'admin',
-        ]);
+        try {
+            $company = Company::create([
+                'name' => $request->company_name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'address' => $request->address,
+                'gst_no' => $request->gst_no,
+            ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            // Handle File Uploads
+            if ($request->hasFile('logo')) {
+                $logoPath = $request->file('logo')->store("company_{$company->id}/branding", 'public');
+                $company->update(['logo' => $logoPath]);
+            }
 
-        return response()->json([
-            'user' => $user->load('company'),
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-        ], 201);
+            if ($request->hasFile('trade_license')) {
+                $tradeLicensePath = $request->file('trade_license')->store("company_{$company->id}/documents", 'public');
+                $company->update(['trade_license' => $tradeLicensePath]);
+            }
+
+            $user = User::create([
+                'company_id' => $company->id,
+                'name' => $request->admin_name,
+                'email' => $request->email,
+                'password' => $request->password,
+                'role' => 'admin',
+            ]);
+
+            DB::commit();
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'user' => $user->load('company'),
+                'token' => $token,
+                'company' => $company,
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Registration Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json(['message' => 'Registration failed: ' . $e->getMessage()], 500);
+        }
     }
 
     public function login(Request $request)
@@ -55,7 +84,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user->load('company'),
+            'user' => $user->load(['company', 'employee.department', 'employee.designation']),
             'access_token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -63,7 +92,7 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        return response()->json($request->user()->load('company'));
+        return response()->json($request->user()->load(['company', 'employee.department', 'employee.designation']));
     }
 
     public function logout(Request $request)

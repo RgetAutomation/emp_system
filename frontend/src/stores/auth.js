@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import api from '../axios';
+import { useAdminStore } from './admin';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -21,11 +22,26 @@ export const useAuthStore = defineStore('auth', {
         throw error;
       }
     },
-    async registerCompany(data) {
+    async registerCompany(formData) {
       try {
-        const response = await api.post('/register-company', data);
-        this.setAuthData(response.data);
-        return true;
+        const response = await api.post('/register-company', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Accept': 'application/json'
+          }
+        });
+        
+        // Ensure response structure matches new API return
+        const token = response.data.access_token || response.data.token;
+        if (token) {
+          this.setAuthData({
+            user: response.data.user,
+            access_token: token
+          });
+          return true;
+        } else {
+          throw new Error('Registration succeeded but no token received.');
+        }
       } catch (error) {
         throw error;
       }
@@ -39,6 +55,18 @@ export const useAuthStore = defineStore('auth', {
         console.error("Logout failed", error);
       } finally {
         this.clearAuthData();
+      }
+    },
+    async fetchCurrentUser() {
+      try {
+        const response = await api.get('/user');
+        this.user = response.data;
+        localStorage.setItem('user', JSON.stringify(response.data));
+      } catch (error) {
+        console.error("Fetch current user failed", error);
+        if (error.response?.status === 401) {
+          this.clearAuthData();
+        }
       }
     },
     setAuthData(data) {
@@ -55,6 +83,9 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('user');
       localStorage.removeItem('token');
       delete api.defaults.headers.common['Authorization'];
+      
+      const adminStore = useAdminStore();
+      adminStore.resetStore();
     }
   }
 });
