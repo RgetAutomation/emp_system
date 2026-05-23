@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import api from '../axios';
+import { useAdminStore } from './admin';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -24,71 +25,26 @@ export const useAuthStore = defineStore('auth', {
         throw error;
       }
     },
-    async employeeLogin(credentials) {
+
       try {
-        this.error = null;
-        const response = await api.post('/employee-login', credentials);
-        this.setAuthData(response.data);
-        // If they already have a PIN, leave pinVerified false to force them to the lock screen!
-        this.pinVerified = !response.data.user.has_pin;
-        return true;
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Login failed';
-        return false;
-      }
-    },
-    async pinLogin(credentials) {
-      try {
-        this.error = null;
-        const response = await api.post('/pin-login', credentials);
-        this.setAuthData(response.data);
-        this.pinVerified = true;
-        return true;
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Login failed';
-        return false;
-      }
-    },
-    async setPin(pin) {
-      try {
-        await api.post('/set-app-pin', { pin });
-        if (this.user) {
-          this.user.has_pin = true;
-          localStorage.setItem('user', JSON.stringify(this.user));
+        const response = await api.post('/register-company', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Accept': 'application/json'
+          }
+        });
+        
+        // Ensure response structure matches new API return
+        const token = response.data.access_token || response.data.token;
+        if (token) {
+          this.setAuthData({
+            user: response.data.user,
+            access_token: token
+          });
+          return true;
+        } else {
+          throw new Error('Registration succeeded but no token received.');
         }
-        this.pinVerified = true;
-        return true;
-      } catch (error) {
-        throw error;
-      }
-    },
-    async sendOtp(credentials) {
-      try {
-        this.error = null;
-        const response = await api.post('/send-otp', credentials);
-        return { success: true, message: response.data.message };
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Failed to send OTP';
-        return { success: false };
-      }
-    },
-    async verifyOtp(credentials) {
-      try {
-        this.error = null;
-        const response = await api.post('/verify-otp', credentials);
-        this.setAuthData(response.data);
-        this.pinVerified = !response.data.user.has_pin;
-        return true;
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Invalid OTP';
-        return false;
-      }
-    },
-    async registerCompany(data) {
-      try {
-        const response = await api.post('/register-company', data);
-        this.setAuthData(response.data);
-        return true;
       } catch (error) {
         throw error;
       }
@@ -102,6 +58,18 @@ export const useAuthStore = defineStore('auth', {
         console.error("Logout failed", error);
       } finally {
         this.clearAuthData();
+      }
+    },
+    async fetchCurrentUser() {
+      try {
+        const response = await api.get('/user');
+        this.user = response.data;
+        localStorage.setItem('user', JSON.stringify(response.data));
+      } catch (error) {
+        console.error("Fetch current user failed", error);
+        if (error.response?.status === 401) {
+          this.clearAuthData();
+        }
       }
     },
     setAuthData(data) {
@@ -130,6 +98,9 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('user');
       localStorage.removeItem('token');
       delete api.defaults.headers.common['Authorization'];
+      
+      const adminStore = useAdminStore();
+      adminStore.resetStore();
     }
   }
 });

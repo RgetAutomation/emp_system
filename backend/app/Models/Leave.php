@@ -15,13 +15,16 @@ class Leave extends Model
         'type',
         'start_date',
         'end_date',
+        'days',
         'reason',
         'status',
+        'admin_note',
+        'approved_by',
     ];
 
     protected $casts = [
         'start_date' => 'date',
-        'end_date' => 'date',
+        'end_date'   => 'date',
     ];
 
     public function user()
@@ -32,5 +35,10 @@ class Leave extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 }

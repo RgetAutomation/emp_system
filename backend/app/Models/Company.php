@@ -17,10 +17,18 @@ class Company extends Model
         'address',
         'status',
         'subscription_ends_at',
+        'gst_no',
+        'trade_license',
+        'logo',
+        'emp_id_prefix',
+        'emp_id_padding',
+        'settings',
     ];
 
     protected $casts = [
         'subscription_ends_at' => 'date',
+        'emp_id_padding' => 'integer',
+        'settings' => 'array',
     ];
 
     public function users()

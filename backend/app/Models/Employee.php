@@ -17,14 +17,33 @@ class Employee extends Model
         'app_pin',
         'department_id',
         'designation_id',
+        'leave_structure_id',
         'phone',
+        'email',
         'address',
         'salary',
         'join_date',
+        'employee_id',
+        'gender',
+        'dob',
+        'employment_type',
+        'status',
+        'personal_details',
+        'bank_details',
+        'identity_docs',
+        'education_experience',
+        'documents',
+        'id_card_image'
     ];
 
     protected $casts = [
+        'personal_details' => 'array',
+        'bank_details' => 'array',
+        'identity_docs' => 'array',
+        'education_experience' => 'array',
+        'documents' => 'array',
         'join_date' => 'date',
+        'dob' => 'date',
         'salary' => 'decimal:2',
     ];
 

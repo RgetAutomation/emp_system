@@ -16,6 +16,9 @@ class Attendance extends Model
         'check_in',
         'check_out',
         'status',
+        'late_minutes',
+        'overtime_minutes',
+        'notes',
     ];
 
     protected $casts = [
