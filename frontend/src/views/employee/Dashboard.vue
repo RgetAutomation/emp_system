@@ -1,5 +1,8 @@
 <script setup>
-
+import { onMounted, ref } from 'vue';
+import { useAuthStore } from '../../stores/auth';
+import { Clock, CheckCircle2, RefreshCw, Printer, ShieldCheck, Mail, Phone, Calendar, MapPin } from 'lucide-vue-next';
+import api from '../../axios';
 
 const authStore = useAuthStore();
 const isCheckedIn = ref(false);
@@ -65,7 +68,24 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
+onMounted(async () => {
+  fetchTodayStatus();
+  await authStore.fetchCurrentUser();
+});
+</script>
 
+<template>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Good {{ new Date().getHours() < 12 ? 'Morning' : 'Afternoon' }}, {{ authStore.user?.name }}!</h1>
+        <p class="text-gray-500 mt-1">Here is your overview for today.</p>
+      </div>
+      <div v-if="authStore.user?.employee?.employee_id" class="hidden sm:flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2 text-indigo-700 text-sm font-semibold">
+        <ShieldCheck class="w-5 h-5 text-indigo-600" />
+        Verified Employee: {{ authStore.user.employee.employee_id }}
+      </div>
+    </div>
 
     <!-- Main Grid Layout -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
