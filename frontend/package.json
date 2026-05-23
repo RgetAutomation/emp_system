@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -13,7 +13,7 @@
     "@tailwindcss/vite": "^4.3.0",
     "autoprefixer": "^10.5.0",
     "axios": "^1.16.1",
-    "html2canvas": "^1.4.1",
+
     "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
     "postcss": "^8.5.15",

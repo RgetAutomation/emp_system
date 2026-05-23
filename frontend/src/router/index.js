@@ -4,12 +4,21 @@ import { useAuthStore } from '../stores/auth';
 const routes = [
   {
     path: '/',
-    redirect: '/login'
+    redirect: () => {
+      const deviceId = localStorage.getItem('Device ID');
+      return deviceId ? '/pin-login' : '/login';
+    }
   },
   {
     path: '/login',
     name: 'Login',
-    component: () => import('../views/auth/Login.vue'),
+    component: () => import('../views/LoginView.vue'),
+    meta: { guest: true }
+  },
+  {
+    path: '/pin-login',
+    name: 'PinLogin',
+    component: () => import('../views/PinLoginView.vue'),
     meta: { guest: true }
   },
   {
@@ -66,19 +75,37 @@ router.beforeEach((to, from) => {
   const authStore = useAuthStore();
   const isAuthenticated = authStore.isAuthenticated;
   const userRole = authStore.user?.role;
+  const pinVerified = authStore.isPinVerified;
+  const hasDeviceId = !!localStorage.getItem('Device ID');
 
+  // 1. If authenticated but PIN not verified, lock them to pin-login
+  if (isAuthenticated && !pinVerified) {
+    if (hasDeviceId) {
+      if (to.path !== '/pin-login') {
+        return next('/pin-login');
+      }
+      return next(); // Allow them to stay on pin-login
+    } else {
+      if (to.path !== '/login') {
+        return next('/login');
+      }
+      return next();
+    }
+  }
+
+  // 2. Unauthenticated user trying to access secure routes
   if (to.meta.requiresAuth && !isAuthenticated) {
     return '/login';
   }
 
+  // 3. Authenticated (and pin verified) trying to access guest routes
   if (to.meta.guest && isAuthenticated) {
     return userRole === 'admin' ? '/admin/dashboard' : '/employee/dashboard';
   }
 
+  // 4. Role checking
   if (to.meta.requiresAuth && to.meta.role && to.meta.role !== userRole) {
-    // If an employee tries to access admin routes, or vice versa
-    return userRole === 'admin' ? '/admin/dashboard' : '/employee/dashboard';
-  }
+
 });
 
 export default router;

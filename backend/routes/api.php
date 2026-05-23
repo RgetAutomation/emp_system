@@ -26,6 +26,11 @@ use App\Http\Controllers\KonnectController;
 
 Route::post('/register-company', [AuthController::class, 'registerCompany']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/employee-login', [AuthController::class, 'employeeLogin']);
+Route::post('/pin-login', [AuthController::class, 'pinLogin']);
+Route::post('/send-otp', [AuthController::class, 'sendOtp']);
+Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+Route::get('/generate-employee', [AuthController::class, 'generateEmployee']);
 
 // Storage proxy — serves uploaded files with proper CORS headers
 Route::get('/file/{path}', function ($path) {
@@ -54,6 +59,7 @@ Route::get('/file-base64/{path}', function ($path) {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
+    Route::post('/set-app-pin', [AuthController::class, 'setAppPin']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/company/update', [CompanyController::class, 'update']);
 

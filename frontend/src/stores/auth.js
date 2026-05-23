@@ -6,11 +6,14 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: JSON.parse(localStorage.getItem('user')) || null,
     token: localStorage.getItem('token') || null,
+    error: null,
+    pinVerified: false,
   }),
   getters: {
     isAuthenticated: (state) => !!state.token,
     isAdmin: (state) => state.user?.role === 'admin',
     isEmployee: (state) => state.user?.role === 'employee',
+    isPinVerified: (state) => state.pinVerified,
   },
   actions: {
     async login(credentials) {
@@ -22,7 +25,7 @@ export const useAuthStore = defineStore('auth', {
         throw error;
       }
     },
-    async registerCompany(formData) {
+
       try {
         const response = await api.post('/register-company', formData, {
           headers: {
@@ -72,8 +75,20 @@ export const useAuthStore = defineStore('auth', {
     setAuthData(data) {
       this.user = data.user;
       this.token = data.access_token;
+      
+      // Store standard auth data
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('token', data.access_token);
+      
+      // Explicitly store the specific fields requested for persistent login
+      if (data.user && data.user.employee_id) {
+        localStorage.setItem('Employee ID', data.user.employee_id);
+        localStorage.setItem('App Token', data.access_token);
+        if (data.user.device_id) {
+          localStorage.setItem('Device ID', data.user.device_id);
+        }
+      }
+
       // Update axios default header
       api.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
     },
