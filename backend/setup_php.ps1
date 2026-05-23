@@ -1,0 +1,8 @@
+$phpDir = "C:\Users\PC\AppData\Local\Microsoft\WinGet\Packages\PHP.PHP.8.4_Microsoft.Winget.Source_8wekyb3d8bbwe"
+Copy-Item "$phpDir\php.ini-development" "$phpDir\php.ini"
+(Get-Content "$phpDir\php.ini") -replace ';extension_dir = "ext"', 'extension_dir = "ext"' | Set-Content "$phpDir\php.ini"
+(Get-Content "$phpDir\php.ini") -replace ';extension=curl', 'extension=curl' | Set-Content "$phpDir\php.ini"
+(Get-Content "$phpDir\php.ini") -replace ';extension=mbstring', 'extension=mbstring' | Set-Content "$phpDir\php.ini"
+(Get-Content "$phpDir\php.ini") -replace ';extension=openssl', 'extension=openssl' | Set-Content "$phpDir\php.ini"
+(Get-Content "$phpDir\php.ini") -replace ';extension=pdo_mysql', 'extension=pdo_mysql' | Set-Content "$phpDir\php.ini"
+(Get-Content "$phpDir\php.ini") -replace ';extension=fileinfo', 'extension=fileinfo' | Set-Content "$phpDir\php.ini"

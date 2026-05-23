@@ -8,4 +8,7 @@ export default defineConfig({
     vue(),
     tailwindcss(),
   ],
+  server: {
+    allowedHosts: true,
+  }
 })
