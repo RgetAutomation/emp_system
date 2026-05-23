@@ -14,7 +14,9 @@ class Employee extends Model
         'company_id',
         'department_id',
         'designation_id',
+        'leave_structure_id',
         'phone',
+        'email',
         'address',
         'salary',
         'join_date',
@@ -27,7 +29,8 @@ class Employee extends Model
         'bank_details',
         'identity_docs',
         'education_experience',
-        'documents'
+        'documents',
+        'id_card_image'
     ];
 
     protected $casts = [

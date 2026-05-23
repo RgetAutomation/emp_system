@@ -6,6 +6,7 @@ export const useAdminStore = defineStore('admin', {
     departments: [],
     designations: [],
     employees: [],
+    leaveStructures: [],
     loading: false,
     error: null,
   }),
@@ -101,6 +102,14 @@ export const useAdminStore = defineStore('admin', {
         this.loading = false;
       }
     },
+    async fetchLeaveStructures() {
+      try {
+        const response = await api.get('/leave-structures');
+        this.leaveStructures = response.data;
+      } catch (err) {
+        console.error('Failed to load leave structures', err);
+      }
+    },
     async createEmployee(formData) {
       try {
         const response = await api.post('/employees', formData, {
@@ -135,6 +144,24 @@ export const useAdminStore = defineStore('admin', {
       try {
         await api.delete(`/employees/${id}`);
         this.employees = this.employees.filter(e => e.id !== id);
+      } catch (err) {
+        throw err;
+      }
+    },
+    async saveIdCardImage(employeeId, base64Image) {
+      try {
+        const response = await api.post(`/employees/${employeeId}/save-id-card`, {
+          image: base64Image
+        });
+        // Update the employee's id_card_image in the local store
+        const index = this.employees.findIndex(e => e.id === employeeId);
+        if (index !== -1) {
+          this.employees[index] = {
+            ...this.employees[index],
+            id_card_image: response.data.id_card_image
+          };
+        }
+        return response.data;
       } catch (err) {
         throw err;
       }

@@ -1,7 +1,7 @@
 <script setup>
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
-import { LogOut, LayoutDashboard, CalendarClock, Plane } from 'lucide-vue-next';
+import { LogOut, LayoutDashboard, CalendarClock, Plane, Clock, Receipt, Banknote, Globe } from 'lucide-vue-next';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -17,7 +17,8 @@ const handleLogout = async () => {
     <!-- Sidebar -->
     <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
       <div class="h-16 flex items-center px-6 border-b border-gray-200">
-        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+        <img v-if="authStore.user?.company?.logo" :src="`http://localhost:8000/storage/${authStore.user.company.logo}`" class="w-8 h-8 object-contain rounded-lg mr-3 shrink-0" alt="Company Logo" />
+        <div v-else class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3 shrink-0">
           <span class="text-white font-bold text-sm">{{ authStore.user?.company?.name?.charAt(0) || 'E' }}</span>
         </div>
         <span class="font-bold text-gray-900 text-lg truncate">{{ authStore.user?.company?.name || 'Workspace' }}</span>
@@ -32,10 +33,30 @@ const handleLogout = async () => {
           <CalendarClock class="w-5 h-5" />
           My Attendance
         </router-link>
-        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
+        <router-link to="/employee/roster" exact-active-class="bg-blue-50 text-blue-700" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
+          <Clock class="w-5 h-5" />
+          My Roster
+        </router-link>
+        <router-link to="/employee/id-card" exact-active-class="bg-blue-50 text-blue-700" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-id-card"><path d="M16 10h2"/><path d="M16 14h2"/><path d="M6.17 15a3 3 0 0 1 5.66 0"/><circle cx="9" cy="11" r="2"/><rect x="2" y="5" width="20" height="14" rx="2"/></svg>
+          Virtual ID Card
+        </router-link>
+        <router-link to="/employee/tax-declarations" exact-active-class="bg-blue-50 text-blue-700" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
+          <Receipt class="w-5 h-5" />
+          Tax Declarations
+        </router-link>
+        <router-link to="/employee/expenses" exact-active-class="bg-blue-50 text-blue-700" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
+          <Banknote class="w-5 h-5" />
+          Expenses
+        </router-link>
+        <router-link to="/employee/konnect" exact-active-class="bg-blue-50 text-blue-700" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
+          <Globe class="w-5 h-5" />
+          Konnect Feed
+        </router-link>
+        <router-link to="/employee/leave" exact-active-class="bg-blue-50 text-blue-700" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium transition-colors">
           <Plane class="w-5 h-5" />
           Leave Requests
-        </a>
+        </router-link>
       </div>
 
       <div class="p-4 border-t border-gray-200">
@@ -59,7 +80,10 @@ const handleLogout = async () => {
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <!-- Mobile Header -->
       <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:hidden">
-        <span class="font-bold text-gray-900">{{ authStore.user?.company?.name }}</span>
+        <div class="flex items-center gap-2">
+          <img v-if="authStore.user?.company?.logo" :src="`http://localhost:8000/storage/${authStore.user.company.logo}`" class="w-8 h-8 object-contain rounded-lg" alt="Company Logo" />
+          <span class="font-bold text-gray-900 truncate max-w-[200px]">{{ authStore.user?.company?.name }}</span>
+        </div>
         <button @click="handleLogout" class="text-gray-500 hover:text-gray-900">
           <LogOut class="w-5 h-5" />
         </button>

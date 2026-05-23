@@ -27,7 +27,17 @@ const routes = [
       { path: 'departments', name: 'AdminDepartments', component: () => import('../views/admin/Departments.vue') },
       { path: 'designations', name: 'AdminDesignations', component: () => import('../views/admin/Designations.vue') },
       { path: 'employees', name: 'AdminEmployees', component: () => import('../views/admin/Employees.vue') },
-      { path: 'attendance', name: 'AdminAttendance', component: () => import('../views/admin/Attendance.vue') }
+      { path: 'attendance', name: 'AdminAttendance', component: () => import('../views/admin/Attendance.vue') },
+      { path: 'roster', name: 'AdminRoster', component: () => import('../views/admin/Roster.vue') },
+      { path: 'leave', name: 'AdminLeave', component: () => import('../views/admin/Leave.vue') },
+      { path: 'leave-structures', name: 'AdminLeaveStructures', component: () => import('../views/admin/LeaveStructures.vue') },
+      { path: 'penalty-rules', name: 'AdminPenaltyRules', component: () => import('../views/admin/PenaltyRules.vue') },
+      { path: 'salary-structures', name: 'AdminSalaryStructures', component: () => import('../views/admin/SalaryStructures.vue') },
+      { path: 'payroll-run', name: 'AdminPayrollRun', component: () => import('../views/admin/PayrollRun.vue') },
+      { path: 'expenses', name: 'AdminExpenseManagement', component: () => import('../views/admin/ExpenseManagement.vue') },
+      { path: 'reports', name: 'AdminReports', component: () => import('../views/admin/Reports.vue') },
+      { path: 'konnect', name: 'AdminKonnect', component: () => import('../views/shared/Konnect.vue') },
+      { path: 'settings', name: 'AdminSettings', component: () => import('../views/admin/Settings.vue') }
     ]
   },
   {
@@ -36,7 +46,13 @@ const routes = [
     meta: { requiresAuth: true, role: 'employee' },
     children: [
       { path: 'dashboard', name: 'EmployeeDashboard', component: () => import('../views/employee/Dashboard.vue') },
-      { path: 'attendance', name: 'EmployeeAttendance', component: () => import('../views/employee/Attendance.vue') }
+      { path: 'attendance', name: 'EmployeeAttendance', component: () => import('../views/employee/Attendance.vue') },
+      { path: 'id-card', name: 'EmployeeIdCard', component: () => import('../views/employee/IdCard.vue') },
+      { path: 'tax-declarations', name: 'EmployeeTaxDeclarations', component: () => import('../views/employee/TaxDeclarations.vue') },
+      { path: 'expenses', name: 'EmployeeExpenses', component: () => import('../views/employee/Expenses.vue') },
+      { path: 'konnect', name: 'EmployeeKonnect', component: () => import('../views/shared/Konnect.vue') },
+      { path: 'roster', name: 'EmployeeRoster', component: () => import('../views/employee/Roster.vue') },
+      { path: 'leave', name: 'EmployeeLeave', component: () => import('../views/employee/Leave.vue') }
     ]
   }
 ];

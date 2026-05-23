@@ -13,7 +13,7 @@ class EmployeeController extends Controller
 {
     public function index(Request $request)
     {
-        $employees = Employee::with(['user', 'department', 'designation'])
+        $employees = Employee::with(['user', 'department', 'designation', 'leaveStructure'])
             ->where('company_id', $request->user()->company_id)
             ->get();
             
@@ -69,9 +69,13 @@ class EmployeeController extends Controller
             // Auto generate employee_id if not provided
             $employeeId = $request->employee_id;
             if (empty($employeeId)) {
+                $company = \App\Models\Company::find($company_id);
+                $prefix = $company && $company->emp_id_prefix !== null ? $company->emp_id_prefix : 'EMP-';
+                $padding = $company && $company->emp_id_padding !== null ? $company->emp_id_padding : 4;
+
                 $count = Employee::where('company_id', $company_id)->count() + 1;
                 do {
-                    $employeeId = 'EMP-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+                    $employeeId = $prefix . str_pad($count, $padding, '0', STR_PAD_LEFT);
                     $exists = Employee::where('company_id', $company_id)->where('employee_id', $employeeId)->exists();
                     if ($exists) {
                         $count++;
@@ -85,6 +89,7 @@ class EmployeeController extends Controller
                 'department_id' => $request->department_id,
                 'designation_id' => $request->designation_id,
                 'phone' => $request->phone,
+                'email' => $request->email ?? $request->email_address ?? $user->email,
                 'salary' => $request->salary,
                 'join_date' => $request->join_date,
                 
@@ -99,6 +104,7 @@ class EmployeeController extends Controller
                 'identity_docs' => $identity_docs,
                 'education_experience' => $education_experience,
                 'documents' => count($documents) > 0 ? $documents : null,
+                'leave_structure_id' => $request->leave_structure_id,
             ]);
 
             DB::commit();
@@ -164,6 +170,7 @@ class EmployeeController extends Controller
                 'department_id' => $request->department_id,
                 'designation_id' => $request->designation_id,
                 'phone' => $request->phone,
+                'email' => $request->email ?? $request->email_address ?? $employee->user->email,
                 'salary' => $request->salary,
                 'join_date' => $request->join_date,
                 
@@ -178,6 +185,7 @@ class EmployeeController extends Controller
                 'identity_docs' => $identity_docs,
                 'education_experience' => $education_experience,
                 'documents' => count($documents) > 0 ? $documents : null,
+                'leave_structure_id' => $request->leave_structure_id,
             ]);
 
             DB::commit();
@@ -187,6 +195,43 @@ class EmployeeController extends Controller
             DB::rollBack();
             return response()->json(['message' => 'Failed to update employee', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    public function saveIdCardImage(Request $request, $id)
+    {
+        $employee = Employee::where('company_id', $request->user()->company_id)->findOrFail($id);
+
+        $request->validate([
+            'image' => 'required|string', // base64 image
+        ]);
+
+        // Decode base64 image
+        $imageData = $request->image;
+        // Remove "data:image/png;base64," prefix if present
+        if (str_contains($imageData, ',')) {
+            $imageData = explode(',', $imageData)[1];
+        }
+        $imageData = base64_decode($imageData);
+
+        // Save the image to storage
+        $company_id = $employee->company_id;
+        $filename = "id_card_{$employee->id}.png";
+        $path = "company_{$company_id}/employees/{$employee->user_id}/id_cards/{$filename}";
+
+        Storage::disk('public')->put($path, $imageData);
+
+        // Delete old image if exists and different
+        if ($employee->id_card_image && $employee->id_card_image !== $path) {
+            Storage::disk('public')->delete($employee->id_card_image);
+        }
+
+        $employee->update(['id_card_image' => $path]);
+
+        return response()->json([
+            'message' => 'ID card image saved successfully',
+            'id_card_image' => $path,
+            'id_card_image_url' => url('storage/' . $path),
+        ]);
     }
 
     public function destroy(Request $request, $id)

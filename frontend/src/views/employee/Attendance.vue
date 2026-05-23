@@ -115,6 +115,7 @@ onMounted(() => {
               <th class="px-6 py-4">Date</th>
               <th class="px-6 py-4">Check-In</th>
               <th class="px-6 py-4">Check-Out</th>
+              <th class="px-6 py-4">Late (min)</th>
               <th class="px-6 py-4">Status</th>
             </tr>
           </thead>
@@ -128,6 +129,12 @@ onMounted(() => {
               </td>
               <td class="px-6 py-4 font-mono text-gray-600">
                 {{ record.check_out || '--:--' }}
+              </td>
+              <td class="px-6 py-4">
+                <span v-if="record.late_minutes" class="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-semibold">
+                  {{ record.late_minutes }} min
+                </span>
+                <span v-else class="text-gray-300 text-sm">—</span>
               </td>
               <td class="px-6 py-4">
                 <span 
@@ -150,7 +157,7 @@ onMounted(() => {
               </td>
             </tr>
             <tr v-if="attendances.length === 0">
-              <td colspan="4" class="px-6 py-12 text-center text-gray-400 font-medium">
+              <td colspan="5" class="px-6 py-12 text-center text-gray-400 font-medium">
                 No attendance logs found. Click "Check In" on your Dashboard to log your first record!
               </td>
             </tr>

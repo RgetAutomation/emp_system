@@ -57,6 +57,18 @@ export const useAuthStore = defineStore('auth', {
         this.clearAuthData();
       }
     },
+    async fetchCurrentUser() {
+      try {
+        const response = await api.get('/user');
+        this.user = response.data;
+        localStorage.setItem('user', JSON.stringify(response.data));
+      } catch (error) {
+        console.error("Fetch current user failed", error);
+        if (error.response?.status === 401) {
+          this.clearAuthData();
+        }
+      }
+    },
     setAuthData(data) {
       this.user = data.user;
       this.token = data.access_token;

@@ -1,9 +1,12 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useAdminStore } from '../../stores/admin';
-import { Users, Plus, Trash2, Edit2, Mail, Phone, Calendar, UploadCloud, ChevronRight, ChevronLeft, CheckCircle2, X, FileText, ExternalLink } from 'lucide-vue-next';
+import { useAuthStore } from '../../stores/auth';
+import { Users, Plus, Trash2, Edit2, Mail, Phone, Calendar, UploadCloud, ChevronRight, ChevronLeft, CheckCircle2, X, FileText, ExternalLink, IdCard, Printer } from 'lucide-vue-next';
+import IdCardComponent from '../../components/IdCardComponent.vue';
 
 const adminStore = useAdminStore();
+const authStore = useAuthStore();
 const showModal = ref(false);
 const isEditing = ref(false);
 const editId = ref(null);
@@ -13,6 +16,23 @@ const activeTab = ref(1);
 const showProfileModal = ref(false);
 const selectedEmployee = ref(null);
 const profileTab = ref('Job & Account');
+
+// ID Card Modal State
+const showIdCardModal = ref(false);
+
+const autoGenerateId = ref(true);
+
+const nextEmployeeIdPreview = computed(() => {
+  const prefix = authStore.user?.company?.emp_id_prefix ?? 'EMP-';
+  const padding = parseInt(authStore.user?.company?.emp_id_padding ?? 4);
+  const count = (adminStore.employees?.length ?? 0) + 1;
+  return prefix + String(count).padStart(padding, '0');
+});
+
+const openIdCardModal = (emp) => {
+  selectedEmployee.value = emp;
+  showIdCardModal.value = true;
+};
 
 const openProfileModal = (emp) => {
   selectedEmployee.value = emp;
@@ -40,7 +60,7 @@ const tabs = [
 const form = ref({
   // Tab 1
   name: '', email: '', password: '', employee_id: '',
-  department_id: '', designation_id: '', employment_type: '', join_date: '',
+  department_id: '', designation_id: '', employment_type: '', join_date: '', leave_structure_id: '',
   
   // Tab 2
   dob: '', gender: '', phone: '',
@@ -71,19 +91,21 @@ onMounted(async () => {
   await Promise.all([
     adminStore.fetchEmployees(),
     adminStore.fetchDepartments(),
-    adminStore.fetchDesignations()
+    adminStore.fetchDesignations(),
+    adminStore.fetchLeaveStructures()
   ]);
 });
 
 const openCreateModal = () => {
   isEditing.value = false;
+  autoGenerateId.value = true;
   activeTab.value = 1;
   existingDocuments.value = {};
   
   // Reset form
   form.value = {
     name: '', email: '', password: '', employee_id: '',
-    department_id: '', designation_id: '', employment_type: '', join_date: '',
+    department_id: '', designation_id: '', employment_type: '', join_date: '', leave_structure_id: '',
     dob: '', gender: '', phone: '',
     personal_details: { father_name: '', mother_name: '', marital_status: '', blood_group: '', current_address: '', permanent_address: '', emergency_contact_name: '', emergency_contact_phone: '' },
     salary: '', status: 'active',
@@ -107,10 +129,13 @@ const prevTab = () => { if (activeTab.value > 1) activeTab.value--; };
 
 const handleSubmit = async () => {
   try {
+    if (autoGenerateId.value && !isEditing.value) {
+      form.value.employee_id = '';
+    }
     const formData = new FormData();
     
     // Append top-level form fields
-    const topLevelFields = ['name', 'email', 'password', 'employee_id', 'department_id', 'designation_id', 'employment_type', 'join_date', 'dob', 'gender', 'phone', 'salary', 'status'];
+    const topLevelFields = ['name', 'email', 'password', 'employee_id', 'department_id', 'designation_id', 'leave_structure_id', 'employment_type', 'join_date', 'dob', 'gender', 'phone', 'salary', 'status'];
     topLevelFields.forEach(field => {
       if (form.value[field] !== null && form.value[field] !== '') {
         formData.append(field, form.value[field]);
@@ -143,6 +168,7 @@ const handleSubmit = async () => {
 
 const openEditModal = (emp) => {
   isEditing.value = true;
+  autoGenerateId.value = false;
   editId.value = emp.id;
   activeTab.value = 1;
   
@@ -154,6 +180,7 @@ const openEditModal = (emp) => {
     employee_id: emp.employee_id || '',
     department_id: emp.department_id || '',
     designation_id: emp.designation_id || '',
+    leave_structure_id: emp.leave_structure_id || '',
     employment_type: emp.employment_type || '',
     join_date: emp.join_date ? emp.join_date.split('T')[0] : '',
     dob: emp.dob ? emp.dob.split('T')[0] : '',
@@ -231,61 +258,104 @@ const handleDelete = async (id) => {
     </div>
 
     <!-- Data Table -->
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div v-if="adminStore.loading" class="p-8 text-center text-gray-500">
-        Loading employees...
+    <div class="bg-white border border-slate-200/85 rounded-2xl shadow-sm overflow-hidden">
+      <div v-if="adminStore.loading" class="p-12 text-center text-slate-500 font-semibold flex flex-col items-center justify-center gap-3">
+        <div class="animate-spin rounded-full h-8 w-8 border-3 border-blue-600 border-t-transparent"></div>
+        <span>Retrieving employee database...</span>
       </div>
-      <table v-else class="w-full text-left text-sm text-gray-600">
-        <thead class="bg-gray-50 text-gray-700 border-b border-gray-200">
+      <table v-else class="w-full text-left text-sm text-slate-600">
+        <thead class="bg-slate-50/75 text-slate-500 border-b border-slate-200/80">
           <tr>
-            <th class="px-6 py-4 font-semibold">Employee</th>
-            <th class="px-6 py-4 font-semibold">Role</th>
-            <th class="px-6 py-4 font-semibold">Contact</th>
-            <th class="px-6 py-4 font-semibold">Joined</th>
-            <th class="px-6 py-4 font-semibold text-right">Actions</th>
+            <th class="px-6 py-4 text-[10px] font-extrabold uppercase tracking-widest">Employee</th>
+            <th class="px-6 py-4 text-[10px] font-extrabold uppercase tracking-widest">Role</th>
+            <th class="px-6 py-4 text-[10px] font-extrabold uppercase tracking-widest">Contact Info</th>
+            <th class="px-6 py-4 text-[10px] font-extrabold uppercase tracking-widest">Joined Date</th>
+            <th class="px-6 py-4 text-[10px] font-extrabold uppercase tracking-widest">Status</th>
+            <th class="px-6 py-4 text-[10px] font-extrabold uppercase tracking-widest text-right">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="emp in adminStore.employees" :key="emp.id" class="hover:bg-gray-50/80 transition-colors cursor-pointer group" @click="openProfileModal(emp)">
-            <td class="px-6 py-4">
+        <tbody class="divide-y divide-slate-100">
+          <tr 
+            v-for="emp in adminStore.employees" 
+            :key="emp.id" 
+            class="hover:bg-slate-50/60 border-l-3 border-l-transparent hover:border-l-indigo-600 transition-all duration-200 cursor-pointer group" 
+            @click="openProfileModal(emp)"
+          >
+            <td class="px-6 py-3.5">
               <div class="flex items-center gap-3">
-                <img v-if="emp.documents?.profile_photo" :src="`http://localhost:8000/storage/${emp.documents.profile_photo}`" class="w-10 h-10 rounded-full object-cover border border-gray-200" />
-                <div v-else class="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                <img v-if="emp.documents?.profile_photo" :src="`http://localhost:8000/storage/${emp.documents.profile_photo}`" class="w-10 h-10 rounded-full object-cover border border-slate-200/80 shadow-sm" />
+                <div v-else class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-50 to-indigo-100 text-indigo-700 flex items-center justify-center font-extrabold text-sm border border-indigo-200/40 shadow-sm">
                   {{ emp.user?.name?.charAt(0) }}
                 </div>
                 <div>
-                  <div class="font-medium text-gray-900 group-hover:text-blue-600 group-hover:underline transition-colors">{{ emp.user?.name }}</div>
-                  <div class="text-xs text-gray-500">ID: {{ emp.employee_id || `EMP-${emp.id.toString().padStart(4, '0')}` }}</div>
+                  <div class="font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug">{{ emp.user?.name }}</div>
+                  <div class="text-[10px] font-extrabold text-slate-400 mt-0.5 tracking-wider uppercase font-mono bg-slate-100 px-1.5 py-0.5 rounded w-fit leading-none">
+                    {{ emp.employee_id || `EMP-${emp.id.toString().padStart(4, '0')}` }}
+                  </div>
                 </div>
               </div>
             </td>
-            <td class="px-6 py-4">
-              <div class="text-gray-900 font-medium">{{ emp.designation?.name || 'No Designation' }}</div>
-              <div class="text-xs text-gray-500">{{ emp.department?.name || 'No Department' }}</div>
+            <td class="px-6 py-3.5">
+              <div class="text-slate-800 font-extrabold leading-tight text-xs uppercase tracking-wide">{{ emp.designation?.name || 'No Designation' }}</div>
+              <div class="text-[11px] font-semibold text-slate-400 mt-0.5">{{ emp.department?.name || 'No Department' }}</div>
             </td>
-            <td class="px-6 py-4 space-y-1">
-              <div class="flex items-center gap-2 text-gray-600"><Mail class="w-3.5 h-3.5" /> {{ emp.user?.email }}</div>
-              <div class="flex items-center gap-2 text-gray-600" v-if="emp.phone"><Phone class="w-3.5 h-3.5" /> {{ emp.phone }}</div>
-            </td>
-            <td class="px-6 py-4">
-              <div class="flex items-center gap-2 text-gray-600">
-                <Calendar class="w-3.5 h-3.5" />
-                {{ emp.join_date ? new Date(emp.join_date).toLocaleDateString() : 'N/A' }}
+            <td class="px-6 py-3.5">
+              <div class="space-y-1">
+                <div class="flex items-center gap-1.5 text-xs text-slate-600">
+                  <Mail class="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span class="truncate max-w-[170px] font-medium" :title="emp.email || emp.user?.email">{{ emp.email || emp.user?.email }}</span>
+                </div>
+                <div v-if="emp.phone" class="flex items-center gap-1.5 text-xs text-slate-600">
+                  <Phone class="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span class="font-semibold text-slate-700">{{ emp.phone }}</span>
+                </div>
               </div>
             </td>
-            <td class="px-6 py-4 text-right cursor-default" @click.stop>
+            <td class="px-6 py-3.5">
+              <div class="flex items-center gap-1.5 text-xs text-slate-600 font-semibold">
+                <Calendar class="w-3.5 h-3.5 text-slate-400" />
+                {{ emp.join_date ? new Date(emp.join_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A' }}
+              </div>
+            </td>
+            <td class="px-6 py-3.5">
+              <span :class="[
+                'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider',
+                emp.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50' : 'bg-rose-50 text-rose-700 border border-rose-200/50'
+              ]">
+                <span class="w-1.5 h-1.5 rounded-full" :class="emp.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+                {{ emp.status || 'active' }}
+              </span>
+            </td>
+            <td class="px-6 py-3.5 text-right cursor-default" @click.stop>
               <div class="flex justify-end gap-2">
-                <button @click="openEditModal(emp)" class="p-1.5 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50">
-                  <Edit2 class="w-4 h-4" />
+                <button 
+                  @click="openIdCardModal(emp)" 
+                  class="p-2 text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100/30 rounded-xl transition-all shadow-sm" 
+                  title="View Virtual ID Card"
+                >
+                  <IdCard class="w-3.5 h-3.5" />
                 </button>
-                <button @click="handleDelete(emp.id)" class="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50">
-                  <Trash2 class="w-4 h-4" />
+                <button 
+                  @click="openEditModal(emp)" 
+                  class="p-2 text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 border border-blue-100/30 rounded-xl transition-all shadow-sm"
+                  title="Edit Profile"
+                >
+                  <Edit2 class="w-3.5 h-3.5" />
+                </button>
+                <button 
+                  @click="handleDelete(emp.id)" 
+                  class="p-2 text-rose-600 hover:text-rose-700 bg-rose-50/50 hover:bg-rose-50 border border-rose-100/30 rounded-xl transition-all shadow-sm"
+                  title="Delete Record"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
                 </button>
               </div>
             </td>
           </tr>
           <tr v-if="adminStore.employees.length === 0">
-            <td colspan="5" class="px-6 py-8 text-center text-gray-500">No employees found. Create one to get started.</td>
+            <td colspan="6" class="px-6 py-12 text-center text-slate-500 font-semibold italic bg-slate-50/30">
+              No employee profiles found in directory. Click "Add Employee" to create one.
+            </td>
           </tr>
         </tbody>
       </table>
@@ -293,34 +363,34 @@ const handleDelete = async (id) => {
 
     <!-- Profile View Modal -->
     <div v-if="showProfileModal && selectedEmployee" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         <!-- Header -->
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white relative">
+        <div class="bg-gradient-to-r from-blue-600 via-indigo-650 to-indigo-750 px-6 py-5 text-white relative">
           <button @click="showProfileModal = false" class="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 border border-white/10 transition-all flex items-center justify-center">
-            <X class="w-5 h-5" />
+            <X class="w-4.5 h-4.5" />
           </button>
           
-          <div class="flex flex-col sm:flex-row items-center gap-5">
-            <img v-if="selectedEmployee.documents?.profile_photo" :src="`http://localhost:8000/storage/${selectedEmployee.documents.profile_photo}`" class="w-24 h-24 rounded-full object-cover border-4 border-white/20 shadow-md" />
-            <div v-else class="w-24 h-24 rounded-full bg-white/15 text-white flex items-center justify-center font-bold text-4xl border-4 border-white/20 shadow-md">
+          <div class="flex flex-col sm:flex-row items-center gap-4">
+            <img v-if="selectedEmployee.documents?.profile_photo" :src="`http://localhost:8000/storage/${selectedEmployee.documents.profile_photo}`" class="w-20 h-20 rounded-full object-cover border-3 border-white/20 shadow-md" />
+            <div v-else class="w-20 h-20 rounded-full bg-white/15 text-white flex items-center justify-center font-bold text-3xl border-3 border-white/20 shadow-md">
               {{ selectedEmployee.user?.name?.charAt(0) }}
             </div>
             
             <div class="text-center sm:text-left space-y-1">
-              <h3 class="font-bold text-2xl tracking-tight">{{ selectedEmployee.user?.name }}</h3>
-              <p class="text-blue-100 font-medium text-sm flex items-center justify-center sm:justify-start gap-2">
+              <h3 class="font-bold text-xl tracking-tight leading-tight">{{ selectedEmployee.user?.name }}</h3>
+              <p class="text-blue-100/90 font-medium text-xs flex items-center justify-center sm:justify-start gap-2">
                 <span>{{ selectedEmployee.designation?.name || 'No Designation' }}</span>
-                <span class="w-1.5 h-1.5 rounded-full bg-blue-200"></span>
+                <span class="w-1 h-1 rounded-full bg-blue-200/65"></span>
                 <span>{{ selectedEmployee.department?.name || 'No Department' }}</span>
               </p>
-              <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 mt-2">
-                <span class="px-2.5 py-0.5 rounded-full bg-white/15 text-xs font-semibold uppercase tracking-wider">
+              <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-1.5">
+                <span class="px-2 py-0.5 rounded-full bg-white/15 text-[10px] font-bold uppercase tracking-wider">
                   {{ selectedEmployee.employee_id || `EMP-${selectedEmployee.id.toString().padStart(4, '0')}` }}
                 </span>
                 <span 
                   :class="[
-                    'px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider',
+                    'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider',
                     selectedEmployee.status === 'active' ? 'bg-green-400/20 text-green-200' : 'bg-red-400/20 text-red-200'
                   ]"
                 >
@@ -332,22 +402,22 @@ const handleDelete = async (id) => {
         </div>
         
         <!-- Tab Selectors -->
-        <div class="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
+        <div class="flex border-b border-slate-250/30 overflow-x-auto bg-slate-50">
           <button 
             v-for="t in ['Job & Account', 'Personal Details', 'Bank & Tax Info', 'Edu & Experience', 'Documents']" 
             :key="t"
             @click="profileTab = t"
-            class="px-6 py-3.5 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors"
-            :class="profileTab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-900'"
+            class="px-5 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors uppercase tracking-wider"
+            :class="profileTab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-900'"
           >
             {{ t }}
           </button>
         </div>
         
         <!-- Content -->
-        <div class="p-8 overflow-y-auto flex-1 min-h-0 custom-scrollbar space-y-6">
+        <div class="p-6 overflow-y-auto flex-1 min-h-0 custom-scrollbar space-y-4">
           <!-- Tab 1: Job & Account -->
-          <div v-if="profileTab === 'Job & Account'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div v-if="profileTab === 'Job & Account'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="info-group">
               <span class="info-label">Email Address</span>
               <span class="info-value">{{ selectedEmployee.user?.email }}</span>
@@ -361,17 +431,21 @@ const handleDelete = async (id) => {
               <span class="info-value">{{ selectedEmployee.employment_type || 'N/A' }}</span>
             </div>
             <div class="info-group">
+              <span class="info-label">Leave Structure</span>
+              <span class="info-value">{{ selectedEmployee.leave_structure?.name || 'N/A' }}</span>
+            </div>
+            <div class="info-group">
               <span class="info-label">Joining Date</span>
               <span class="info-value">{{ selectedEmployee.join_date ? new Date(selectedEmployee.join_date).toLocaleDateString() : 'N/A' }}</span>
             </div>
             <div class="info-group">
               <span class="info-label">Basic Salary</span>
-              <span class="info-value font-semibold text-gray-950">{{ selectedEmployee.salary ? `${selectedEmployee.salary} / month` : 'N/A' }}</span>
+              <span class="info-value font-bold text-slate-950">{{ selectedEmployee.salary ? `${selectedEmployee.salary} / month` : 'N/A' }}</span>
             </div>
           </div>
           
           <!-- Tab 2: Personal Details -->
-          <div v-if="profileTab === 'Personal Details'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div v-if="profileTab === 'Personal Details'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="info-group">
               <span class="info-label">Date of Birth</span>
               <span class="info-value">{{ selectedEmployee.dob ? new Date(selectedEmployee.dob).toLocaleDateString() : 'N/A' }}</span>
@@ -398,16 +472,19 @@ const handleDelete = async (id) => {
             </div>
             <div class="info-group md:col-span-2">
               <span class="info-label">Current Address</span>
-              <span class="info-value whitespace-pre-line">{{ selectedEmployee.personal_details?.current_address || 'N/A' }}</span>
+              <span class="info-value whitespace-pre-line leading-relaxed">{{ selectedEmployee.personal_details?.current_address || 'N/A' }}</span>
             </div>
             <div class="info-group md:col-span-2">
               <span class="info-label">Permanent Address</span>
-              <span class="info-value whitespace-pre-line">{{ selectedEmployee.personal_details?.permanent_address || 'N/A' }}</span>
+              <span class="info-value whitespace-pre-line leading-relaxed">{{ selectedEmployee.personal_details?.permanent_address || 'N/A' }}</span>
             </div>
             
-            <div class="md:col-span-2 border-t pt-4 mt-2">
-              <h4 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Emergency Contact</h4>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="md:col-span-2 border-t border-slate-100 pt-3.5 mt-1">
+              <h4 class="font-extrabold text-slate-800 mb-3 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Emergency Contact Details
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="info-group">
                   <span class="info-label">Contact Name</span>
                   <span class="info-value">{{ selectedEmployee.personal_details?.emergency_contact_name || 'N/A' }}</span>
@@ -421,8 +498,8 @@ const handleDelete = async (id) => {
           </div>
           
           <!-- Tab 3: Bank & Tax Info -->
-          <div v-if="profileTab === 'Bank & Tax Info'" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div v-if="profileTab === 'Bank & Tax Info'" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="info-group">
                 <span class="info-label">Salary Type</span>
                 <span class="info-value">{{ selectedEmployee.bank_details?.salary_type || 'N/A' }}</span>
@@ -445,9 +522,12 @@ const handleDelete = async (id) => {
               </div>
             </div>
             
-            <div class="border-t pt-6 mt-4">
-              <h4 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Identity & Tax IDs</h4>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="border-t border-slate-100 pt-3.5 mt-2">
+              <h4 class="font-extrabold text-slate-800 mb-3 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Identity &amp; Tax Identifications
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="info-group">
                   <span class="info-label">PAN Card Number</span>
                   <span class="info-value font-mono">{{ selectedEmployee.identity_docs?.pan_no || 'N/A' }}</span>
@@ -477,8 +557,8 @@ const handleDelete = async (id) => {
           </div>
           
           <!-- Tab 4: Edu & Experience -->
-          <div v-if="profileTab === 'Edu & Experience'" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div v-if="profileTab === 'Edu & Experience'" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="info-group">
                 <span class="info-label">Highest Qualification</span>
                 <span class="info-value">{{ selectedEmployee.education_experience?.highest_qualification || 'N/A' }}</span>
@@ -492,19 +572,22 @@ const handleDelete = async (id) => {
                 <span class="info-value">{{ selectedEmployee.education_experience?.passing_year || 'N/A' }}</span>
               </div>
               <div class="info-group">
-                <span class="info-label">Skills</span>
-                <div class="flex flex-wrap gap-1.5 mt-1.5">
-                  <span v-for="skill in (selectedEmployee.education_experience?.skills?.split(',') || [])" :key="skill" class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">
+                <span class="info-label">Professional Skills</span>
+                <div class="flex flex-wrap gap-1.5 mt-1">
+                  <span v-for="skill in (selectedEmployee.education_experience?.skills?.split(',') || [])" :key="skill" class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[11px] font-bold border border-slate-200/55">
                     {{ skill.trim() }}
                   </span>
-                  <span v-if="!selectedEmployee.education_experience?.skills">N/A</span>
+                  <span v-if="!selectedEmployee.education_experience?.skills" class="text-sm font-semibold text-slate-800">N/A</span>
                 </div>
               </div>
             </div>
             
-            <div class="border-t pt-6 mt-4">
-              <h4 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Work Experience</h4>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="border-t border-slate-100 pt-3.5 mt-2">
+              <h4 class="font-extrabold text-slate-800 mb-3 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Past Employment History
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="info-group">
                   <span class="info-label">Previous Company</span>
                   <span class="info-value">{{ selectedEmployee.education_experience?.prev_company_name || 'N/A' }}</span>
@@ -526,7 +609,7 @@ const handleDelete = async (id) => {
           </div>
           
           <!-- Tab 5: Documents -->
-          <div v-if="profileTab === 'Documents'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div v-if="profileTab === 'Documents'" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div 
               v-for="docName in [
                 { key: 'resume', label: 'Resume / CV' },
@@ -539,35 +622,35 @@ const handleDelete = async (id) => {
                 { key: 'appointment_letter', label: 'Appointment Letter' }
               ]" 
               :key="docName.key" 
-              class="p-4 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between gap-4"
+              class="p-3.5 bg-slate-50/50 hover:bg-slate-50 border border-slate-200/50 hover:border-indigo-100 rounded-xl flex items-center justify-between gap-4 transition-all duration-200"
             >
               <div>
-                <div class="font-semibold text-gray-800 text-sm">{{ docName.label }}</div>
-                <div class="text-xs text-gray-400 mt-0.5">
-                  {{ selectedEmployee.documents?.[docName.key] ? 'Uploaded' : 'Not Uploaded' }}
+                <div class="font-bold text-slate-800 text-sm leading-snug">{{ docName.label }}</div>
+                <div class="text-[10px] uppercase font-bold mt-1 tracking-wider" :class="selectedEmployee.documents?.[docName.key] ? 'text-emerald-500' : 'text-slate-400'">
+                  {{ selectedEmployee.documents?.[docName.key] ? 'Uploaded' : 'Not Provided' }}
                 </div>
               </div>
               <a 
                 v-if="selectedEmployee.documents?.[docName.key]" 
                 :href="`http://localhost:8000/storage/${selectedEmployee.documents[docName.key]}`" 
                 target="_blank"
-                class="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors whitespace-nowrap"
+                class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 rounded-lg text-[11px] font-extrabold border border-blue-100 transition-colors whitespace-nowrap"
               >
                 View File
               </a>
-              <span v-else class="text-xs text-gray-300 font-semibold italic">N/A</span>
+              <span v-else class="text-[10px] text-slate-350 font-bold uppercase tracking-wider px-2 py-1 bg-slate-100/55 rounded-md border border-slate-200/35">N/A</span>
             </div>
           </div>
         </div>
         
         <!-- Footer -->
-        <div class="px-8 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
-          <button @click="editFromProfile" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-2">
-            <Edit2 class="w-4 h-4" />
+        <div class="px-6 py-3.5 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+          <button @click="editFromProfile" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-sm uppercase tracking-wide">
+            <Edit2 class="w-3.5 h-3.5" />
             Edit Profile
           </button>
-          <button @click="showProfileModal = false" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-sm transition-colors border border-gray-200">
-            Close Profile
+          <button @click="showProfileModal = false" class="px-5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs transition-colors shadow-sm uppercase tracking-wide">
+            Close
           </button>
         </div>
       </div>
@@ -611,7 +694,27 @@ const handleDelete = async (id) => {
             <div v-if="activeTab === 1" class="space-y-6">
               <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">Account & Employment Details</h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Employee ID</label><input v-model="form.employee_id" type="text" class="form-input" placeholder="e.g. EMP-0001 (Auto-generates if empty)" /></div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                  <div class="flex items-center gap-2">
+                    <input 
+                      :value="autoGenerateId ? nextEmployeeIdPreview : form.employee_id" 
+                      @input="e => { if (!autoGenerateId) form.employee_id = e.target.value }"
+                      type="text" 
+                      :disabled="autoGenerateId" 
+                      class="form-input flex-1 disabled:bg-gray-50 disabled:text-gray-900 disabled:font-bold disabled:opacity-100 disabled:cursor-not-allowed disabled:border-gray-200" 
+                      placeholder="e.g. EMP-0001" 
+                    />
+                    <label v-if="!isEditing" class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none bg-gray-50 border border-gray-200 px-3 py-2.5 rounded-xl hover:bg-gray-100 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        v-model="autoGenerateId" 
+                        class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" 
+                      />
+                      Auto-generate
+                    </label>
+                  </div>
+                </div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label><input v-model="form.name" type="text" required class="form-input" /></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Email Address *</label><input v-model="form.email" type="email" required class="form-input" /></div>
                 <div v-if="!isEditing"><label class="block text-sm font-medium text-gray-700 mb-1">Initial Password *</label><input v-model="form.password" type="text" required class="form-input" /></div>
@@ -639,6 +742,13 @@ const handleDelete = async (id) => {
                     <option value="Part-time">Part-time</option>
                     <option value="Contract">Contract</option>
                     <option value="Intern">Intern</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Leave Structure</label>
+                  <select v-model="form.leave_structure_id" class="form-input">
+                    <option value="">Select Structure</option>
+                    <option v-for="s in adminStore.leaveStructures" :key="s.id" :value="s.id">{{ s.name }}</option>
                   </select>
                 </div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Joining Date</label><input v-model="form.join_date" type="date" class="form-input" /></div>
@@ -867,6 +977,47 @@ const handleDelete = async (id) => {
         </div>
       </div>
     </div>
+
+    <!-- Virtual ID Card Modal -->
+    <div v-if="showIdCardModal && selectedEmployee" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+          <h3 class="font-bold text-gray-900 text-lg">Virtual ID Card</h3>
+          <button @click="showIdCardModal = false" class="text-gray-400 hover:text-gray-600 hover:bg-gray-200 bg-white rounded-full p-1.5 transition-colors">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div class="p-8 bg-gray-100 flex justify-center">
+          <IdCardComponent 
+            :employeeData="{
+              ...selectedEmployee.user,
+              employee: selectedEmployee
+            }" 
+            :companyData="authStore.user?.company" 
+            :hideHeader="true"
+            :showSaveButton="true"
+            :employeeId="selectedEmployee.id"
+            @save-success="(data) => { selectedEmployee.id_card_image = data.id_card_image; }"
+          />
+        </div>
+
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center print:hidden">
+          <p class="text-xs text-gray-400">Click "Save ID Card" to generate &amp; store the image to the database.</p>
+          <div class="flex gap-3">
+            <button @click="showIdCardModal = false" class="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl text-sm transition-colors">
+              Close
+            </button>
+            <button @click="() => window.print()" class="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-2">
+              <Printer class="w-4 h-4" />
+              Print ID Card
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
 </template>
 
@@ -874,13 +1025,13 @@ const handleDelete = async (id) => {
 @reference "tailwindcss";
 
 .info-group {
-  @apply flex flex-col gap-1 bg-gray-50/50 p-3.5 rounded-xl border border-gray-100;
+  @apply flex flex-col gap-1 bg-slate-50/40 px-4 py-2.5 rounded-xl border border-slate-200/50 hover:bg-slate-50 hover:border-indigo-100/80 transition-all duration-200;
 }
 .info-label {
-  @apply text-xs font-bold text-gray-400 uppercase tracking-wider;
+  @apply text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-none;
 }
 .info-value {
-  @apply text-sm font-semibold text-gray-800;
+  @apply text-xs sm:text-sm font-bold text-slate-800 leading-normal;
 }
 
 .form-input {

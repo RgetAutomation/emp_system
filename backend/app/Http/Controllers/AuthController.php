@@ -84,7 +84,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user->load('company'),
+            'user' => $user->load(['company', 'employee.department', 'employee.designation']),
             'access_token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -92,7 +92,7 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        return response()->json($request->user()->load('company'));
+        return response()->json($request->user()->load(['company', 'employee.department', 'employee.designation']));
     }
 
     public function logout(Request $request)
