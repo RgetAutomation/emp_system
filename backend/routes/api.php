@@ -35,10 +35,21 @@ Route::get('/file/{path}', function ($path) {
     }
     $mimeType = mime_content_type($fullPath);
     return response()->file($fullPath, [
-        'Access-Control-Allow-Origin' => '*',
         'Cache-Control' => 'public, max-age=86400',
         'Content-Type' => $mimeType,
     ]);
+})->where('path', '.*');
+
+// Base64 proxy for html2canvas to guarantee no tainted canvas
+Route::get('/file-base64/{path}', function ($path) {
+    $fullPath = storage_path('app/public/' . $path);
+    if (!file_exists($fullPath)) {
+        return response()->json(['error' => 'Not found'], 404);
+    }
+    $mimeType = mime_content_type($fullPath);
+    $data = file_get_contents($fullPath);
+    $base64 = 'data:' . $mimeType . ';base64,' . base64_encode($data);
+    return response()->json(['base64' => $base64]);
 })->where('path', '.*');
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -50,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('analytics/dashboard', [AnalyticsController::class, 'dashboard']);
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('designations', DesignationController::class);
+    Route::post('employees/import', [EmployeeController::class, 'import']);
     Route::apiResource('employees', EmployeeController::class);
     Route::apiResource('penalty-rules', PenaltyRuleController::class);
     Route::apiResource('salary-structures', SalaryStructureController::class);

@@ -199,39 +199,54 @@ class EmployeeController extends Controller
 
     public function saveIdCardImage(Request $request, $id)
     {
-        $employee = Employee::where('company_id', $request->user()->company_id)->findOrFail($id);
-
         $request->validate([
-            'image' => 'required|string', // base64 image
+            'image' => 'required|string'
         ]);
 
-        // Decode base64 image
-        $imageData = $request->image;
-        // Remove "data:image/png;base64," prefix if present
-        if (str_contains($imageData, ',')) {
-            $imageData = explode(',', $imageData)[1];
-        }
-        $imageData = base64_decode($imageData);
+        $employee = Employee::findOrFail($id);
 
-        // Save the image to storage
-        $company_id = $employee->company_id;
-        $filename = "id_card_{$employee->id}.png";
-        $path = "company_{$company_id}/employees/{$employee->user_id}/id_cards/{$filename}";
-
-        Storage::disk('public')->put($path, $imageData);
-
-        // Delete old image if exists and different
-        if ($employee->id_card_image && $employee->id_card_image !== $path) {
-            Storage::disk('public')->delete($employee->id_card_image);
+        if ($employee->company_id !== $request->user()->company_id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $employee->update(['id_card_image' => $path]);
+        try {
+            $base64_image = $request->input('image');
 
-        return response()->json([
-            'message' => 'ID card image saved successfully',
-            'id_card_image' => $path,
-            'id_card_image_url' => url('storage/' . $path),
-        ]);
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64_image, $type)) {
+                $base64_image = substr($base64_image, strpos($base64_image, ',') + 1);
+                $type = strtolower($type[1]);
+
+                if (!in_array($type, ['jpg', 'jpeg', 'png', 'gif'])) {
+                    return response()->json(['message' => 'Invalid image type'], 400);
+                }
+
+                $base64_image = str_replace(' ', '+', $base64_image);
+                $image_data = base64_decode($base64_image);
+
+                if ($image_data === false) {
+                    return response()->json(['message' => 'Base64 decode failed'], 400);
+                }
+
+                $fileName = 'id_card_' . time() . '_' . uniqid() . '.' . $type;
+                $path = 'employees/id_cards/' . $fileName;
+
+                Storage::disk('public')->put($path, $image_data);
+
+                $documents = $employee->documents ?? [];
+                $documents['id_card_image'] = $path;
+                $employee->documents = $documents;
+                $employee->save();
+
+                return response()->json([
+                    'message' => 'ID card image saved successfully',
+                    'path' => $path
+                ]);
+            } else {
+                return response()->json(['message' => 'Invalid image data format'], 400);
+            }
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to save image: ' . $e->getMessage()], 500);
+        }
     }
 
     public function destroy(Request $request, $id)
@@ -245,4 +260,173 @@ class EmployeeController extends Controller
 
         return response()->json(['message' => 'Employee deleted successfully']);
     }
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|max:5120'
+        ]);
+
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        
+        $rows = [];
+        if ($extension === 'csv' || $extension === 'txt') {
+            $handle = fopen($file->getPathname(), "r");
+            while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                $rows[] = $row;
+            }
+            fclose($handle);
+        } else if ($extension === 'xlsx' || $extension === 'xls') {
+            $libraryPath = app_path('Libraries/SimpleXLSX.php');
+            if (file_exists($libraryPath)) {
+                require_once $libraryPath;
+            }
+
+            if (class_exists(\Shuchkin\SimpleXLSX::class)) {
+                if ($xlsx = \Shuchkin\SimpleXLSX::parse($file->getPathname())) {
+                    $rows = $xlsx->rows();
+                } else {
+                    return response()->json(['message' => \Shuchkin\SimpleXLSX::parseError()], 400);
+                }
+            } else {
+                return response()->json(['message' => 'Excel support is not installed. Please run "composer require shuchkin/simplexlsx" in your backend folder.'], 500);
+            }
+        } else {
+            return response()->json(['message' => 'Unsupported file format'], 400);
+        }
+
+        if (empty($rows)) {
+            return response()->json(['message' => 'File is empty or invalid format'], 400);
+        }
+
+        $header = array_shift($rows);
+        if (!$header) {
+            return response()->json(['message' => 'Invalid header format'], 400);
+        }
+
+        // Normalize header
+        $header = array_map(function($col) {
+            return strtolower(trim($col));
+        }, $header);
+        
+        $successCount = 0;
+        $errors = [];
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($rows as $row) {
+                if (count($row) != count($header)) continue;
+                $data = array_combine($header, $row);
+                
+                if (empty($data['name']) || empty($data['email'])) {
+                    continue;
+                }
+
+                // Check if user already exists
+                if (User::where('email', $data['email'])->exists()) {
+                    $errors[] = "Email {$data['email']} already exists.";
+                    continue;
+                }
+
+                $user = User::create([
+                    'company_id' => $request->user()->company_id,
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'password' => Hash::make('password123'),
+                    'role' => 'employee',
+                ]);
+
+                // Auto generate employee_id
+                $company_id = $request->user()->company_id;
+                $company = \App\Models\Company::find($company_id);
+                $prefix = $company && $company->emp_id_prefix !== null ? $company->emp_id_prefix : 'EMP-';
+                $padding = $company && $company->emp_id_padding !== null ? $company->emp_id_padding : 4;
+
+                $count = Employee::where('company_id', $company_id)->count() + 1;
+                do {
+                    $employeeId = $prefix . str_pad($count, $padding, '0', STR_PAD_LEFT);
+                    $exists = Employee::where('company_id', $company_id)->where('employee_id', $employeeId)->exists();
+                    if ($exists) {
+                        $count++;
+                    }
+                } while ($exists);
+
+                // Handle Department
+                $department_id = null;
+                if (!empty($data['department'])) {
+                    $dept = \App\Models\Department::firstOrCreate([
+                        'company_id' => $company_id,
+                        'name' => $data['department']
+                    ]);
+                    $department_id = $dept->id;
+                }
+
+                // Handle Designation
+                $designation_id = null;
+                if (!empty($data['designation'])) {
+                    $desig = \App\Models\Designation::firstOrCreate([
+                        'company_id' => $company_id,
+                        'name' => $data['designation']
+                    ]);
+                    $designation_id = $desig->id;
+                }
+
+                $personal_details = [
+                    'current_address' => $data['current address'] ?? null,
+                ];
+
+                $bank_details = [
+                    'bank_name' => $data['bank name'] ?? null,
+                    'bank_account_no' => $data['account number'] ?? null,
+                    'ifsc_code' => $data['ifsc code'] ?? null,
+                ];
+
+                $identity_docs = [
+                    'pan_no' => $data['pan number'] ?? null,
+                    'aadhaar_no' => $data['aadhaar number'] ?? null,
+                ];
+
+                Employee::create([
+                    'user_id' => $user->id,
+                    'company_id' => $company_id,
+                    'department_id' => $department_id,
+                    'designation_id' => $designation_id,
+                    'phone' => $data['phone'] ?? null,
+                    'email' => $data['email'],
+                    'salary' => isset($data['salary']) && is_numeric($data['salary']) ? $data['salary'] : null,
+                    'employee_id' => $employeeId,
+                    'gender' => $data['gender'] ?? null,
+                    'employment_type' => isset($data['employment type']) && !empty($data['employment type']) ? $data['employment type'] : 'Full-time',
+                    'status' => 'active',
+                    'join_date' => !empty($data['join date']) ? $data['join date'] : now()->format('Y-m-d'),
+                    'dob' => !empty($data['dob']) ? $data['dob'] : null,
+                    'personal_details' => $personal_details,
+                    'bank_details' => $bank_details,
+                    'identity_docs' => $identity_docs,
+                ]);
+
+                $successCount++;
+            }
+            DB::commit();
+            if (isset($handle) && is_resource($handle)) {
+                fclose($handle);
+            }
+
+            return response()->json([
+                'message' => "Successfully imported {$successCount} employees.",
+                'errors' => $errors
+            ]);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            if (isset($handle) && is_resource($handle)) {
+                fclose($handle);
+            }
+            \Log::error('Import error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json(['message' => 'Import failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+
 }

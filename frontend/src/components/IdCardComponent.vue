@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { UserCircle, Printer, Save, CheckCircle2, Loader2, Sparkles, Building2 } from 'lucide-vue-next';
+import { UserCircle, Printer, Save, Download, CheckCircle2, Loader2, Sparkles, Building2 } from 'lucide-vue-next';
 
 const props = defineProps({
   employeeData: {
@@ -73,56 +73,75 @@ const user = computed(() => props.employeeData?.user || props.employeeData);
 const employee = computed(() => props.employeeData?.employee || props.employeeData);
 const company = computed(() => props.companyData);
 
-const getImageUrl = (path) => {
-  // Use the proxy API route so CORS headers are included (needed for html2canvas)
-  return path ? `http://localhost:8000/api/file/${path}` : null;
+const fetchBase64 = async (path) => {
+  if (!path) return null;
+  try {
+    const { default: api } = await import('../axios');
+    const res = await api.get(`/file-base64/${path}`);
+    return res.data.base64;
+  } catch {
+    return null;
+  }
 };
 
-// Direct display URLs — always works for <img> tags
-const profilePhotoUrl = computed(() => {
-  profilePhotoError.value = false; // reset error when data changes
-  const path = employee.value?.documents?.profile_photo;
-  return getImageUrl(path);
-});
+watch(() => employee.value?.documents?.profile_photo, async (newPath) => {
+  profilePhotoError.value = false;
+  profilePhotoBase64.value = await fetchBase64(newPath);
+}, { immediate: true });
 
-const companyLogoUrl = computed(() => {
-  companyLogoError.value = false; // reset error when data changes
-  const path = company.value?.logo;
-  return getImageUrl(path);
-});
+watch(() => company.value?.logo, async (newPath) => {
+  companyLogoError.value = false;
+  companyLogoBase64.value = await fetchBase64(newPath);
+}, { immediate: true });
 
-// Convert an image URL to base64 via a canvas proxy (avoids CORS taint)
-const toBase64 = (url) => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } catch {
-        resolve(null);
-      }
-    };
-    img.onerror = () => resolve(null);
-    img.src = url + '?t=' + Date.now(); // cache-bust
-  });
-};
-
-// Convert images to base64 only when needed for html2canvas capture
-const preloadImagesForCapture = async () => {
-  const profilePath = employee.value?.documents?.profile_photo;
-  const logoPath = company.value?.logo;
-
-  profilePhotoBase64.value = profilePath ? await toBase64(getImageUrl(profilePath)) : null;
-  companyLogoBase64.value = logoPath ? await toBase64(getImageUrl(logoPath)) : null;
-};
-
-const handlePrint = () => {
-  window.print();
+const handlePrint = async () => {
+  if (!cardRef.value) return;
+  isSaving.value = true;
+  try {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(cardRef.value, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: null,
+    });
+    const imgData = canvas.toDataURL('image/png');
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+    
+    const contentWindow = iframe.contentWindow;
+    contentWindow.document.open();
+    contentWindow.document.write(`
+      <html>
+        <head>
+          <title>Print ID Card</title>
+          <style>
+            @page { size: auto; margin: 5mm; }
+            body { margin: 0; display: flex; justify-content: center; align-items: flex-start; padding-top: 20px; }
+            img { width: 3.375in; height: 2.125in; object-fit: contain; } /* Standard ID card size */
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <img src="${imgData}" onload="window.print(); setTimeout(() => window.parent.document.body.removeChild(window.frameElement), 1000);" />
+        </body>
+      </html>
+    `);
+    contentWindow.document.close();
+  } catch (err) {
+    console.error('Print failed:', err);
+    saveError.value = 'Failed to generate print view.';
+  } finally {
+    isSaving.value = false;
+  }
 };
 
 const captureAndSave = async () => {
@@ -132,10 +151,7 @@ const captureAndSave = async () => {
   saveError.value = null;
 
   try {
-    // Convert images to base64 just before capture (needed for html2canvas CORS)
-    await preloadImagesForCapture();
-
-    // Wait a tick so base64 images render in the DOM before capture
+    // Wait a tick to ensure rendering
     await new Promise(resolve => setTimeout(resolve, 300));
 
     const html2canvas = (await import('html2canvas')).default;
@@ -150,28 +166,20 @@ const captureAndSave = async () => {
 
     const base64Image = canvas.toDataURL('image/png');
 
-    const { default: api } = await import('../axios');
-    const employeeId = props.employeeId || employee.value?.id;
-
-    const response = await api.post(`/employees/${employeeId}/save-id-card`, {
-      image: base64Image
-    });
+    // Download to user's computer
+    const link = document.createElement('a');
+    link.download = `ID_Card_${employee.value?.employee_id || employee.value?.id || 'Employee'}.png`;
+    link.href = base64Image;
+    link.click();
 
     savedSuccess.value = true;
-    emit('save-success', response.data);
 
     setTimeout(() => {
       savedSuccess.value = false;
-      // Clear base64 after save to restore direct URL display
-      profilePhotoBase64.value = null;
-      companyLogoBase64.value = null;
     }, 3000);
   } catch (err) {
-    console.error('Error saving ID card:', err);
-    saveError.value = err?.response?.data?.message || 'Failed to save ID card image.';
-    // Clear base64 on error too
-    profilePhotoBase64.value = null;
-    companyLogoBase64.value = null;
+    console.error('Error downloading ID card:', err);
+    saveError.value = 'Failed to download ID card image.';
   } finally {
     isSaving.value = false;
   }
@@ -200,7 +208,7 @@ const captureAndSave = async () => {
       </div>
     </div>
 
-    <!-- Save ID Card button — always shown when showSaveButton=true (admin modal) -->
+    <!-- Download ID Card button -->
     <div v-if="showSaveButton" class="flex justify-center">
       <button 
         @click="captureAndSave"
@@ -212,8 +220,8 @@ const captureAndSave = async () => {
       >
         <Loader2 v-if="isSaving" class="w-4 h-4 animate-spin" />
         <CheckCircle2 v-else-if="savedSuccess" class="w-4 h-4" />
-        <Save v-else class="w-4 h-4" />
-        {{ isSaving ? 'Generating & Saving...' : savedSuccess ? 'Saved to Database!' : 'Save ID Card to Database' }}
+        <Download v-else class="w-4 h-4" />
+        {{ isSaving ? 'Generating & Downloading...' : savedSuccess ? 'Downloaded!' : 'Download ID Card Image' }}
       </button>
     </div>
 
@@ -260,14 +268,14 @@ const captureAndSave = async () => {
           class="absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300" 
           :style="{ opacity: idCardSettings.watermark_opacity }"
         >
-          <img v-if="(companyLogoBase64 || companyLogoUrl) && !companyLogoError" :src="companyLogoBase64 || companyLogoUrl" class="w-24 h-24 object-contain filter grayscale" crossorigin="anonymous" @error="companyLogoError = true" />
+          <img v-if="companyLogoBase64 && !companyLogoError" :src="companyLogoBase64" class="w-24 h-24 object-contain filter grayscale" crossorigin="anonymous" @error="companyLogoError = true" />
           <Building2 v-else class="w-24 h-24 text-slate-400" />
         </div>
 
         <!-- Card Header -->
         <div class="flex items-center justify-between border-b pb-2 z-10" :style="{ borderColor: `${idCardSettings.theme_color}30` }">
           <div class="flex items-center gap-2">
-            <img v-if="(companyLogoBase64 || companyLogoUrl) && !companyLogoError" :src="companyLogoBase64 || companyLogoUrl" class="w-6 h-6 object-contain" crossorigin="anonymous" @error="companyLogoError = true" />
+            <img v-if="companyLogoBase64 && !companyLogoError" :src="companyLogoBase64" class="w-6 h-6 object-contain" crossorigin="anonymous" @error="companyLogoError = true" />
             <Building2 v-else class="w-6 h-6" :style="{ color: idCardSettings.theme_color }" />
             <p class="text-[9px] font-extrabold uppercase tracking-wide truncate max-w-[120px]">{{ company?.name || 'Company Name' }}</p>
           </div>
@@ -302,8 +310,8 @@ const captureAndSave = async () => {
             }"
           >
             <img 
-              v-if="(profilePhotoBase64 || profilePhotoUrl) && !profilePhotoError" 
-              :src="profilePhotoBase64 || profilePhotoUrl" 
+              v-if="profilePhotoBase64 && !profilePhotoError" 
+              :src="profilePhotoBase64" 
               alt="Profile Photo" 
               class="w-full h-full object-cover pointer-events-none"
               crossorigin="anonymous"
@@ -358,20 +366,6 @@ const captureAndSave = async () => {
   </div>
 </template>
 
-<style>
-@media print {
-  body * {
-    visibility: hidden !important;
-  }
-  .id-card-container, .id-card-container * {
-    visibility: visible !important;
-  }
-  .id-card-container {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    transform: scale(1.5);
-    transform-origin: top left;
-  }
-}
+<style scoped>
+/* Scoped styles */
 </style>

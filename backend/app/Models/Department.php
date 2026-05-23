@@ -12,6 +12,14 @@ class Department extends Model
     protected $fillable = [
         'company_id',
         'name',
+        'code',
+        'manager_id',
+        'location',
+        'is_active'
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     public function company()
@@ -22,5 +30,10 @@ class Department extends Model
     public function employees()
     {
         return $this->hasMany(Employee::class);
+    }
+
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
     }
 }

@@ -8,10 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('attendances', function (Blueprint $table) {
-            $table->integer('late_minutes')->nullable()->after('status');
-            $table->text('notes')->nullable()->after('late_minutes');
-        });
+        if (!Schema::hasColumn('attendances', 'late_minutes')) {
+            Schema::table('attendances', function (Blueprint $table) {
+                $table->integer('late_minutes')->nullable()->after('status');
+                $table->text('notes')->nullable()->after('late_minutes');
+            });
+        }
     }
 
     public function down(): void

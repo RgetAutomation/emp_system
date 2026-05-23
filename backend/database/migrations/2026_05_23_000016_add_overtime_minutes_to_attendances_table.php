@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('attendances', function (Blueprint $table) {
-            $table->integer('overtime_minutes')->default(0)->after('late_minutes');
-        });
+        if (!Schema::hasColumn('attendances', 'overtime_minutes')) {
+            Schema::table('attendances', function (Blueprint $table) {
+                $table->integer('overtime_minutes')->default(0)->after('late_minutes');
+            });
+        }
     }
 
     /**

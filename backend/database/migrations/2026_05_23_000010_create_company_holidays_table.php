@@ -8,7 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('company_holidays', function (Blueprint $table) {
+        if (!Schema::hasTable('company_holidays')) {
+            Schema::create('company_holidays', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained()->onDelete('cascade');
             $table->string('name');                    // e.g. "Eid ul-Fitr", "Independence Day"
@@ -17,7 +18,8 @@ return new class extends Migration
             $table->boolean('is_recurring')->default(false); // repeat every year on same month+day
             $table->text('description')->nullable();
             $table->timestamps();
-        });
+            });
+        }
     }
 
     public function down(): void

@@ -8,7 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('penalty_rules', function (Blueprint $table) {
+        if (!Schema::hasTable('penalty_rules')) {
+            Schema::create('penalty_rules', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained()->onDelete('cascade');
             $table->string('name');
@@ -19,7 +20,8 @@ return new class extends Migration
             $table->integer('applies_after')->default(1); // apply penalty after N occurrences
             $table->boolean('active')->default(true);
             $table->timestamps();
-        });
+            });
+        }
     }
 
     public function down(): void

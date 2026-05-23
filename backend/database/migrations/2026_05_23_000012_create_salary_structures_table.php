@@ -8,7 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('salary_structures', function (Blueprint $table) {
+        if (!Schema::hasTable('salary_structures')) {
+            Schema::create('salary_structures', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained()->onDelete('cascade');
             $table->foreignId('employee_id')->constrained()->onDelete('cascade');
@@ -18,7 +19,8 @@ return new class extends Migration
             $table->date('effective_from');
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-        });
+            });
+        }
     }
 
     public function down(): void

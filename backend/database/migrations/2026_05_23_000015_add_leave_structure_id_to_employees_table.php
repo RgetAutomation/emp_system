@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('employees', function (Blueprint $table) {
-            $table->foreignId('leave_structure_id')->nullable()->constrained('leave_structures')->nullOnDelete();
-        });
+        if (!Schema::hasColumn('employees', 'leave_structure_id')) {
+            Schema::table('employees', function (Blueprint $table) {
+                $table->foreignId('leave_structure_id')->nullable()->constrained('leave_structures')->nullOnDelete();
+            });
+        }
     }
 
     /**

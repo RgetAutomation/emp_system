@@ -8,7 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('tax_declarations', function (Blueprint $table) {
+        if (!Schema::hasTable('tax_declarations')) {
+            Schema::create('tax_declarations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('employee_id')->constrained()->cascadeOnDelete();
             $table->foreignId('company_id')->constrained()->cascadeOnDelete();
@@ -24,7 +25,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['employee_id', 'financial_year']);
-        });
+            });
+        }
     }
 
     public function down(): void

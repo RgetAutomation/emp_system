@@ -239,6 +239,44 @@ const handleDelete = async (id) => {
     await adminStore.deleteEmployee(id);
   }
 };
+
+const fileInput = ref(null);
+const isImporting = ref(false);
+
+const triggerFileInput = () => {
+  fileInput.value.click();
+};
+
+const handleImport = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  try {
+    isImporting.value = true;
+    const res = await adminStore.importEmployees(file);
+    alert(res.message);
+    if (res.errors && res.errors.length > 0) {
+      console.warn('Import warnings:', res.errors);
+      alert('Some rows had errors. Check console for details: \n' + res.errors.join('\n'));
+    }
+  } catch (err) {
+    alert(err.response?.data?.message || 'Import failed');
+  } finally {
+    isImporting.value = false;
+    event.target.value = ''; // reset
+  }
+};
+
+const downloadTemplate = () => {
+  const csvContent = "data:text/csv;charset=utf-8,Name,Email,Phone,Salary,Gender,Employment Type,DOB,Join Date,Department,Designation,Current Address,PAN Number,Aadhaar Number,Bank Name,Account Number,IFSC Code\nJohn Doe,john@example.com,1234567890,50000,Male,Full-time,1990-01-01,2023-01-01,IT,Software Engineer,123 Main St,ABCDE1234F,123456789012,HDFC Bank,1234567890,HDFC0001234\nJane Smith,jane@example.com,0987654321,60000,Female,Part-time,,,,,,,,,,";
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "employee_import_template.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 </script>
 
 <template>
@@ -251,10 +289,13 @@ const handleDelete = async (id) => {
         </h1>
         <p class="text-gray-500 mt-1 text-sm">Manage comprehensive employee profiles</p>
       </div>
-      <button @click="openCreateModal" class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-        <Plus class="w-4 h-4" />
-        Add Employee
-      </button>
+      <div class="flex items-center gap-3">
+
+        <button @click="openCreateModal" class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-bold shadow-sm">
+          <Plus class="w-4 h-4" />
+          <span class="hidden sm:inline">Add Employee</span>
+        </button>
+      </div>
     </div>
 
     <!-- Data Table -->
@@ -759,7 +800,7 @@ const handleDelete = async (id) => {
             <div v-if="activeTab === 2" class="space-y-6">
               <h4 class="text-lg font-semibold text-gray-800 border-b pb-2">Personal Information</h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label><input v-model="form.phone" type="text" class="form-input" /></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label><input v-model="form.phone" type="tel" class="form-input" /></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label><input v-model="form.dob" type="date" class="form-input" /></div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
@@ -786,7 +827,7 @@ const handleDelete = async (id) => {
                 
                 <h5 class="md:col-span-2 text-md font-semibold text-gray-700 mt-4">Emergency Contact</h5>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">Contact Name</label><input v-model="form.personal_details.emergency_contact_name" type="text" class="form-input" /></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label><input v-model="form.personal_details.emergency_contact_phone" type="text" class="form-input" /></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label><input v-model="form.personal_details.emergency_contact_phone" type="tel" class="form-input" /></div>
               </div>
             </div>
 
@@ -808,7 +849,7 @@ const handleDelete = async (id) => {
                 
                 <h5 class="md:col-span-2 text-md font-semibold text-gray-700 mt-4 border-b pb-2">Tax & Government IDs</h5>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">PAN Number</label><input v-model="form.identity_docs.pan_no" type="text" class="form-input" /></div>
-                <div><label class="block text-sm font-medium text-gray-700 mb-1">Aadhaar Number</label><input v-model="form.identity_docs.aadhaar_no" type="text" class="form-input" /></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Aadhaar Number</label><input v-model="form.identity_docs.aadhaar_no" type="number" class="form-input" /></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">UAN Number (PF)</label><input v-model="form.bank_details.uan_no" type="text" class="form-input" /></div>
                 <div><label class="block text-sm font-medium text-gray-700 mb-1">ESIC Number</label><input v-model="form.bank_details.esic_no" type="text" class="form-input" /></div>
                 

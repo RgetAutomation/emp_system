@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('leave_structures', function (Blueprint $table) {
+        if (!Schema::hasTable('leave_structures')) {
+            Schema::create('leave_structures', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->text('description')->nullable();
             $table->json('allowances'); // e.g., {"sick": 10, "casual": 10, "annual": 15}
             $table->timestamps();
-        });
+            });
+        }
     }
 
     /**

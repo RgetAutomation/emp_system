@@ -148,6 +148,21 @@ export const useAdminStore = defineStore('admin', {
         throw err;
       }
     },
+    async importEmployees(file) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await api.post('/employees/import', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        await this.fetchEmployees(); // refresh list
+        return response.data;
+      } catch (err) {
+        throw err;
+      }
+    },
     async saveIdCardImage(employeeId, base64Image) {
       try {
         const response = await api.post(`/employees/${employeeId}/save-id-card`, {
